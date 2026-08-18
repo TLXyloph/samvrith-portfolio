@@ -63,12 +63,12 @@ function Toggle({ active, label, onClick }: { active: boolean; label: string; on
 
 export default function LabPage() {
   const [progress, setProgress] = useState(0);
-  const [cellPx, setCellPx] = useState(14);
+  const [cellPx, setCellPx] = useState(18);
   const [exposure, setExposure] = useState(1);
-  const [underlayer, setUnderlayer] = useState(0.5);
-  const [rippleGain, setRippleGain] = useState(2.5);
-  const [glyphMin, setGlyphMin] = useState(0.78);
-  const [glyphGain, setGlyphGain] = useState(0.4);
+  const [underlayer, setUnderlayer] = useState(0.6);
+  const [rippleGain, setRippleGain] = useState(4);
+  const [glyphMin, setGlyphMin] = useState(0.85);
+  const [glyphGain, setGlyphGain] = useState(0.45);
   const [variant, setVariant] = useState<SignalVariant>("silicon");
   const [focus, setFocusState] = useState<FocusId>(null);
   const [overrideOn, setOverrideOn] = useState(false);
@@ -140,7 +140,7 @@ export default function LabPage() {
         <Slider
           label="cellPx"
           min={8}
-          max={20}
+          max={24}
           step={1}
           value={cellPx}
           display={`${cellPx}px`}
@@ -167,7 +167,7 @@ export default function LabPage() {
         <Slider
           label="rippleGain"
           min={0}
-          max={4}
+          max={6}
           step={0.05}
           value={rippleGain}
           display={rippleGain.toFixed(2)}
@@ -176,7 +176,7 @@ export default function LabPage() {
         <Slider
           label="glyphMin"
           min={0.5}
-          max={1}
+          max={1.1}
           step={0.01}
           value={glyphMin}
           display={glyphMin.toFixed(2)}

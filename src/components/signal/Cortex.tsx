@@ -28,7 +28,8 @@ import {
   STAR_FRAG,
 } from "./shaders";
 import { createStarPositions, mulberry32, STAR_COUNT, type BrainData } from "./brain";
-import { buildBrainSurface, buildBackplane } from "./surface";
+import { buildBrainSurface, buildBackplane, buildCerebellum, buildBrainstem } from "./surface";
+import { buildPcbTexture } from "./pcbTexture";
 import { SpikeSystem } from "./Spikes";
 import type { FieldState } from "./state";
 
@@ -37,7 +38,7 @@ interface CortexAssets {
   brainRig: THREE.Group;
   spin: THREE.Group;
   starRig: THREE.Group;
-  brainMat: THREE.ShaderMaterial;
+  brainMats: THREE.ShaderMaterial[];
   pointsMat: THREE.ShaderMaterial;
   traceMat: THREE.ShaderMaterial | null;
   starMat: THREE.ShaderMaterial;
@@ -51,32 +52,50 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
   const rig = new THREE.Group();
   const spin = new THREE.Group();
   rig.add(spin);
+  const silicon = data.variant === "silicon";
 
-  // — the solid luminous brain surface (carries the image) —
-  const brainGeo = buildBrainSurface(data.variant);
-  const brainMat = new THREE.ShaderMaterial({
-    vertexShader: BRAIN_VERT,
-    fragmentShader: BRAIN_FRAG,
-    side: THREE.DoubleSide,
-    uniforms: {
-      uTime: { value: 0 },
-      uPulse: { value: 0 },
-      uSync: { value: 0 },
-      uRipple: { value: 0 },
-      uWavePhase: { value: -1.6 },
-      uRampDiv: { value: data.variant === "silicon" ? 1.45 : 2.7 },
-      uClipX: { value: data.variant === "silicon" ? -0.03 : 1000 },
-      uClusterAct: { value: fs.clusterAct },
-      uAccent: { value: new THREE.Color("#8b9cf5") },
-      uColA: { value: new THREE.Color("#8b9cf5") },
-      uColB: { value: new THREE.Color("#a78bfa") },
-      uColC: { value: new THREE.Color("#f472b6") },
-      uColRim: { value: new THREE.Color("#c4b5fd") },
-    },
-  });
-  const brainMesh = new THREE.Mesh(brainGeo, brainMat);
-  brainMesh.frustumCulled = false;
-  spin.add(brainMesh);
+  // — organ material family: flat mauve "gray matter", fold-shaded —
+  const brainMats: THREE.ShaderMaterial[] = [];
+  const geos: THREE.BufferGeometry[] = [];
+  const makeOrganMat = (baseGain: number, offsetX: number) =>
+    new THREE.ShaderMaterial({
+      vertexShader: BRAIN_VERT,
+      fragmentShader: BRAIN_FRAG,
+      side: THREE.DoubleSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uPulse: { value: 0 },
+        uSync: { value: 0 },
+        uRipple: { value: 0 },
+        uWavePhase: { value: -1.6 },
+        uBaseGain: { value: baseGain },
+        // planar seam cut in spin space → shift by the mesh offset
+        uClipX: { value: silicon ? -0.03 - offsetX : 1000 },
+        uClusterAct: { value: fs.clusterAct },
+        uAccent: { value: new THREE.Color("#8b9cf5") },
+        uColBase: { value: new THREE.Color("#b795ad") },
+        uColRim: { value: new THREE.Color("#c4b5fd") },
+      },
+    });
+  const addOrgan = (
+    geo: THREE.BufferGeometry,
+    baseGain: number,
+    pos: [number, number, number],
+    rotX = 0,
+  ) => {
+    const mat = makeOrganMat(baseGain, pos[0]);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(pos[0], pos[1], pos[2]);
+    mesh.rotation.x = rotX;
+    mesh.frustumCulled = false;
+    spin.add(mesh);
+    brainMats.push(mat);
+    geos.push(geo);
+  };
+  // cerebrum (carries the image), cerebellum (finer folia), brainstem
+  addOrgan(buildBrainSurface(data.variant), 0.78, [0, 0, 0]);
+  addOrgan(buildCerebellum(), 0.6, silicon ? [-0.38, -0.62, -0.52] : [0, -0.64, -0.55]);
+  addOrgan(buildBrainstem(), 0.66, silicon ? [-0.24, -0.88, -0.2] : [0, -0.9, -0.22], 0.12);
 
   // — organic point cloud —
   const pgeo = new THREE.BufferGeometry();
@@ -133,10 +152,17 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
   let idMat: THREE.ShaderMaterial | null = null;
   let backGeo: THREE.BufferGeometry | null = null;
   let backMat: THREE.MeshBasicMaterial | null = null;
+  let pcbTex: THREE.CanvasTexture | null = null;
   if (data.silicon) {
-    // hazy PCB-substrate glow behind the traces (underlayer body)
+    // painted PCB image behind the traces — its underlayer blur is the
+    // cohesive hazy circuit board (aligned with the glyph traces)
     backGeo = buildBackplane();
-    backMat = new THREE.MeshBasicMaterial({ vertexColors: true, depthWrite: false });
+    pcbTex = buildPcbTexture(data.silicon);
+    backMat = new THREE.MeshBasicMaterial({
+      map: pcbTex,
+      vertexColors: true,
+      depthWrite: false,
+    });
     const back = new THREE.Mesh(backGeo, backMat);
     back.frustumCulled = false;
     spin.add(back);
@@ -228,7 +254,7 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
     brainRig: rig,
     spin,
     starRig,
-    brainMat,
+    brainMats,
     pointsMat,
     traceMat,
     starMat,
@@ -236,8 +262,8 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
     idGroup,
     spikes,
     dispose: () => {
-      brainGeo.dispose();
-      brainMat.dispose();
+      for (const g of geos) g.dispose();
+      for (const m of brainMats) m.dispose();
       pgeo.dispose();
       pointsMat.dispose();
       egeo.dispose();
@@ -247,6 +273,7 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
       idMat?.dispose();
       backGeo?.dispose();
       backMat?.dispose();
+      pcbTex?.dispose();
       spikes.dispose();
       starGeo.dispose();
       starMat.dispose();
@@ -283,13 +310,15 @@ export function Cortex({ fs, data }: { fs: FieldState; data: BrainData }) {
     }
     assets.starRig.rotation.y = fs.camYaw * 0.3;
 
-    const bu = assets.brainMat.uniforms;
-    bu.uTime.value = fs.time;
-    bu.uPulse.value = fs.pulse;
-    bu.uSync.value = fs.sync;
-    bu.uRipple.value = fs.rippleAmp;
-    bu.uWavePhase.value = fs.wavePhase;
-    (bu.uAccent.value as THREE.Color).copy(fs.accent);
+    for (const m of assets.brainMats) {
+      const bu = m.uniforms;
+      bu.uTime.value = fs.time;
+      bu.uPulse.value = fs.pulse;
+      bu.uSync.value = fs.sync;
+      bu.uRipple.value = fs.rippleAmp;
+      bu.uWavePhase.value = fs.wavePhase;
+      (bu.uAccent.value as THREE.Color).copy(fs.accent);
+    }
 
     const pu = assets.pointsMat.uniforms;
     pu.uTime.value = fs.time;

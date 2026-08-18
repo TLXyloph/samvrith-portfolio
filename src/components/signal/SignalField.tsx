@@ -17,12 +17,12 @@
  *
  * Props (all optional): externalScroll (skip the internal window-scroll
  * fallback; drive progress via scrollBus/Lenis instead), cellPx (glyph cell
- * size in CSS px — default 14 fine-pointer / 16 coarse), exposure (base
+ * size in CSS px — default 18 fine-pointer / 20 coarse), exposure (base
  * multiplier, default 1), underlayer (soft color bed strength, default
- * 0.5), variant ("silicon" default | "connectome"; `?variant=a` in the URL
+ * 0.6), variant ("silicon" default | "connectome"; `?variant=a` in the URL
  * overrides to "connectome"), clusterOverride (lab: pin activation −1..8),
- * rippleGain (scroll-ripple sensitivity, default 2.5), glyphMin/glyphGain
- * (variable glyph size: scale = min + gain·tier, defaults 0.78/0.4).
+ * rippleGain (scroll-ripple sensitivity, default 4), glyphMin/glyphGain
+ * (variable glyph size: scale = min + gain·tier, defaults 0.85/0.45).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -278,7 +278,7 @@ export default function SignalField({
     const s = createFieldState();
     s.fine = env.fine;
     s.reduced = env.reduced;
-    s.cellPx = env.fine ? 14 : 16;
+    s.cellPx = env.fine ? 18 : 20;
     s.variant = effVariant;
     return s;
   }, [env, effVariant]);
@@ -315,12 +315,12 @@ export default function SignalField({
 
   // props → field state
   useEffect(() => {
-    fs.cellPx = cellPx ?? (env.fine ? 14 : 16);
+    fs.cellPx = cellPx ?? (env.fine ? 18 : 20);
     fs.exposureBase = exposure ?? 1;
-    fs.underlayer = underlayer ?? 0.5;
-    fs.rippleGain = rippleGain ?? 2.5;
-    fs.glyphMin = glyphMin ?? 0.78;
-    fs.glyphGain = glyphGain ?? 0.4;
+    fs.underlayer = underlayer ?? 0.6;
+    fs.rippleGain = rippleGain ?? 4;
+    fs.glyphMin = glyphMin ?? 0.85;
+    fs.glyphGain = glyphGain ?? 0.45;
   }, [fs, env.fine, cellPx, exposure, underlayer, rippleGain, glyphMin, glyphGain]);
 
   // reduced-motion preference may change at runtime

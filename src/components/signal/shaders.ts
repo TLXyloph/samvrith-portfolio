@@ -30,15 +30,18 @@ export const BRAIN_VERT = /* glsl */ `
 uniform float uRipple;
 uniform float uWavePhase;
 attribute float aCluster;
+attribute float aFold;
 varying vec3 vN;
 varying vec3 vViewPos;
 varying float vX;
 varying float vAct;
 varying float vRipple;
+varying float vFold;
 ${CLUSTER_ACT}
 void main(){
   vAct = clusterAct(aCluster);
   vX = position.x;
+  vFold = aFold;
   float band = exp(-pow((position.x - uWavePhase) * 3.2, 2.0));
   vRipple = uRipple * band;
   vN = normalize(normalMatrix * normal);
@@ -50,37 +53,35 @@ void main(){
 
 export const BRAIN_FRAG = /* glsl */ `
 uniform float uPulse;
-uniform float uRampDiv; // long-axis span (2.7 full brain, 1.45 half)
-uniform float uClipX;   // planar seam cut (silicon: −0.03; connectome: off)
+uniform float uClipX;    // planar seam cut (silicon: −0.03; connectome: off)
+uniform float uBaseGain; // per-mesh tint (cerebellum/stem slightly darker)
 uniform vec3 uAccent;
-uniform vec3 uColA;
-uniform vec3 uColB;
-uniform vec3 uColC;
+uniform vec3 uColBase;   // flat organ color — "gray matter" mauve
 uniform vec3 uColRim;
 varying vec3 vN;
 varying vec3 vViewPos;
 varying float vX;
 varying float vAct;
 varying float vRipple;
+varying float vFold;
 void main(){
   if (vX > uClipX) discard; // crisp seam edge
-  float t = clamp((vX + 1.35) / uRampDiv, 0.0, 1.0);
-  vec3 ramp = mix(uColA, uColB, smoothstep(0.0, 0.55, t));
-  ramp = mix(ramp, uColC, smoothstep(0.5, 1.0, t));
   vec3 N = normalize(vN);
   if (!gl_FrontFacing) N = -N;
   // fixed camera-space light, upper-left, lambert wrap 0.5
   vec3 L = normalize(vec3(-0.55, 0.65, 0.52));
   float ndl = clamp((dot(N, L) + 0.5) / 1.5, 0.0, 1.0);
-  vec3 col = ramp * (0.24 + 0.80 * ndl);
+  // valley shading: sulci dark, gyral crests bright — the fold field IS
+  // the visible cortex texture (spans ~3–4 ramp tiers across a fold)
+  float crest = clamp(vFold, 0.0, 1.0);
+  float shade = mix(0.4, 1.32, pow(crest, 1.15));
+  vec3 col = uColBase * (0.24 + 0.80 * ndl) * shade;
   if (!gl_FrontFacing) col *= 0.4; // fake translucency
   // fresnel rim as emissive — draws the ASCII silhouette
   vec3 V = normalize(-vViewPos);
   float fres = pow(1.0 - abs(dot(N, V)), 2.2) * 1.15;
-  col += uColRim * fres;
-  // keep the body in the mid-high ramp (= + x #) so characters read as
-  // letterforms; only rim/highlights touch the top tiers
-  col *= 0.64;
+  col += uColRim * fres * (0.55 + 0.45 * crest);
+  col *= uBaseGain;
   col = mix(col, uAccent, 0.45 * vAct);
   col *= 1.0 + 0.7 * vAct;
   col *= 1.0 + 0.20 * uPulse;
@@ -136,7 +137,8 @@ void main(){
   float act = clusterAct(aBlock);
   float band = exp(-pow((position.x - uWavePhase) * 3.2, 2.0)) * uRipple;
   vec3 col = mix(uTraceCol, uAccent, min(1.0, 0.35 * act + 0.5 * band));
-  float b = (0.34 + 0.55 * act) * (1.0 + 1.0 * band); // ripple lights cells as it passes
+  // bright enough that orientation glyphs land ramp-top
+  float b = (0.8 + 0.55 * act) * (1.0 + 1.0 * band); // ripple lights cells as it passes
   if (aOrient > 0.6) b *= 1.4; // junctions/vias pop slightly
   vColor = col * b;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -325,12 +327,13 @@ void main(){
                     : orient < 0.625 ? 11.0  // '|'
                     : orient < 0.875 ? 5.0   // '+'
                     : 12.0;                  // 'o'
-      vec2 inCell = fract(gl_FragCoord.xy / microSize);
+      // fine glyphs draw slightly larger than their cells — obvious ASCII
+      vec2 inCell = (fract(gl_FragCoord.xy / microSize) - 0.5) / 1.05 + 0.5;
       float mask = texture2D(tGlyphs, vec2((cellIdx + inCell.x) / 16.0, inCell.y)).a;
       float maxc = max(c.r, max(c.g, c.b));
       vec3 chroma = c / max(maxc, 1e-4);
       vec3 col = uVoid + under;
-      if (lum > 0.03) col += mask * chroma * (0.25 + 0.75 * lum);
+      if (lum > 0.03) col += mask * chroma * (0.35 + 0.95 * lum);
       gl_FragColor = vec4(toSrgb(col * uGlobalDim), 1.0);
       return;
     }

@@ -175,10 +175,15 @@ export function buildEdges(cloud: BrainCloud, count: number, seed: number): Uint
 
 /* ————— silicon hemisphere (Manhattan traces on a curved shell) ————— */
 
-export const SIL_CELL = 0.038; // world units per FINE ascii cell (hero scale)
-const U0 = 0.03; // seam edge → total seam gap ≈ 0.06 with organic cut at −0.03
-const NX = 33;
-const NY = 52;
+// v4: fine ascii cell = cellPx/2 = 9 CSS px → ~0.054 world on screen at the
+// hero scale 1.15 → ~0.047 in local space.
+export const SIL_CELL = 0.047; // world units per FINE ascii cell
+export const SIL_U0 = 0.03; // seam edge → total gap ≈ 0.06 with organic cut at −0.03
+const U0 = SIL_U0;
+const NX = 27;
+const NY = 42;
+export const SIL_U1 = U0 + NX * SIL_CELL;
+export const SIL_V1 = (NY / 2) * SIL_CELL;
 
 export interface SiliconTrace {
   points: Float32Array; // step points, one per fine cell (for packets)
