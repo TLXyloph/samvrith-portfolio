@@ -174,6 +174,7 @@ export default function SignalField({
 }: SignalFieldProps) {
   const [env] = useState(detectEnv);
   const [reduced, setReduced] = useState(env.reduced);
+  const [ready, setReady] = useState(false); // first frame rendered → fade in
   const fs = useMemo(() => {
     const s = createFieldState();
     s.fine = env.fine;
@@ -181,6 +182,19 @@ export default function SignalField({
     s.cellPx = env.fine ? 12 : 14;
     return s;
   }, [env]);
+
+  // first-frame handshake: reveal the canvas once the pipeline has drawn
+  useEffect(() => {
+    if (fs.firstFrameDone) {
+      // frame landed before this effect (shouldn't happen, but stay safe)
+      const id = window.setTimeout(() => setReady(true), 0);
+      return () => window.clearTimeout(id);
+    }
+    fs.onFirstFrame = () => setReady(true);
+    return () => {
+      fs.onFirstFrame = null;
+    };
+  }, [fs]);
 
   // props → field state
   useEffect(() => {
@@ -259,7 +273,15 @@ export default function SignalField({
   if (!env.ok) return null; // no WebGL2 → page stays plain #050508
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 z-0">
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-0 z-0"
+      style={{
+        // hidden until the first complete ASCII frame, then ease in
+        opacity: ready ? 1 : 0,
+        transition: reduced ? "none" : "opacity 600ms cubic-bezier(0.16, 1, 0.3, 1)",
+      }}
+    >
       <Canvas
         frameloop={reduced ? "demand" : "always"}
         dpr={env.dpr}

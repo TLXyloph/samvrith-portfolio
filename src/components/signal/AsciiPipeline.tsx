@@ -88,6 +88,7 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
   const pack = useMemo(() => buildPack(), []);
   const targets = useRef<Targets | null>(null);
   const sizeVec = useMemo(() => new THREE.Vector2(), []);
+  const warm = useRef<"idle" | "pending" | "ready">("idle");
 
   // scene ground: everything quantizes against #050508
   useEffect(() => {
@@ -132,6 +133,39 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
   );
 
   useFrame(() => {
+    // — cold-start warmup: compile all programs before any visible frame —
+    if (warm.current !== "ready") {
+      if (warm.current === "idle") {
+        warm.current = "pending";
+        const done = () => {
+          if (warm.current === "ready") return;
+          warm.current = "ready";
+          invalidate(); // demand mode: schedule the real first frame
+        };
+        try {
+          if (typeof gl.compileAsync === "function") {
+            gl.compileAsync(scene, camera)
+              .then(() => {
+                pack.mesh.material = pack.asciiMat;
+                return gl.compileAsync(pack.fsScene, pack.cam);
+              })
+              .then(() => {
+                pack.mesh.material = pack.blitMat;
+                return gl.compileAsync(pack.fsScene, pack.cam);
+              })
+              .then(done, done);
+            window.setTimeout(done, 1500); // safety net (context loss mid-warm)
+          } else {
+            gl.compile(scene, camera);
+            done();
+          }
+        } catch {
+          done();
+        }
+      }
+      return; // skip rendering until programs are warm
+    }
+
     const db = gl.getDrawingBufferSize(sizeVec);
     const w = Math.max(2, Math.floor(db.x));
     const h = Math.max(2, Math.floor(db.y));
@@ -196,6 +230,15 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
     pack.mesh.material = pack.asciiMat;
     gl.setRenderTarget(null);
     gl.render(pack.fsScene, pack.cam);
+
+    // first complete 3-pass frame → let SignalField fade the canvas in
+    // (re-offered every frame until a consumer picks it up)
+    fs.firstFrameDone = true;
+    if (fs.onFirstFrame) {
+      const cb = fs.onFirstFrame;
+      fs.onFirstFrame = null;
+      cb();
+    }
   }, 1);
 
   return null;

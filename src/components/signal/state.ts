@@ -38,6 +38,10 @@ export interface FieldState {
   reduced: boolean;
   fine: boolean;
   narrow: boolean;
+  /** First-frame handshake: the pipeline flags its first complete frame and
+   * keeps offering the callback until SignalField consumes it (fade-in). */
+  firstFrameDone: boolean;
+  onFirstFrame: (() => void) | null;
 }
 
 export function createFieldState(): FieldState {
@@ -65,6 +69,8 @@ export function createFieldState(): FieldState {
     reduced: false,
     fine: true,
     narrow: false,
+    firstFrameDone: false,
+    onFirstFrame: null,
   };
 }
 
