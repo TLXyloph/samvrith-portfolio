@@ -195,7 +195,8 @@ export const contributions: Contribution[] = [
   {
     repo: "stanfordnlp/dspy",
     repoNote: "declarative LM programming · 36k★",
-    title: "upstream patches: context propagation across optimizer worker threads; ReAct/CodeAct field-collision detection",
+    title: "fix(predict): return ReAct outputs from finish tool args instead of an extra extract call",
+    href: "https://github.com/stanfordnlp/dspy/pull/10122",
     state: "open",
   },
 ];
