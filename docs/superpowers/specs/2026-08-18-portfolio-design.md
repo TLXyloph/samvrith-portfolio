@@ -72,3 +72,28 @@ visible; semantic landmarks; Lighthouse-conscious (one canvas, no heavy deps).
 
 Next.js 16 · React 19 · TS · Tailwind v4 · three + @react-three/fiber ·
 hand-rolled ASCII postprocess (no postprocessing lib) · motion · lenis.
+
+## V2 — Silicon Cortex (user-directed revision, 2026-08-18)
+
+Flower retired. Hero becomes a brain, two variants sharing one system:
+
+- **C "silicon" (default, `/`)**: left hemisphere = organic spiking glyph
+  point-cloud cortex; right hemisphere = seeded Manhattan silicon traces.
+  **Dual-resolution quantization** (user's idea): organic at cellPx, silicon
+  at cellPx/2 nested micro-cells, trace glyphs picked by orientation
+  (`- | + o`) — the seam is literally a change in sampling resolution.
+  Spikes cross the seam and become routed packets.
+- **A "connectome" (`/?variant=a`)**: full-brain point cloud, same spiking
+  and region system, no silicon.
+- **Scroll = regional activation** (replaces disperse): each section fires a
+  cortical cluster/silicon block; accent hue walks blue→iris→pink→rose;
+  contact = whole-brain synchrony. Featured projects override via a
+  scrollBus focus channel (SparseEMG → silicon block, NeuroMCP → parietal).
+- **Particles → discreet motes**: ≤12/s, 3–6 s life, slow drift, dim (ramp
+  index 1–3), max 40 alive.
+- **Liquid-metal accents** (purple chrome, tiny surfaces only): primary CTA
+  pill, `merged` badge text, 2px scroll-progress bar. Recipe in globals.css
+  (`.liquid-metal`, `.liquid-metal-text`), reduced-motion-safe.
+- **Content re-centered on interests** (neuromorphic computing · agentic AI ·
+  biosignal interfaces …) — new headline/summary + interests chips; motto
+  "from microvolts to meaning" unchanged.
