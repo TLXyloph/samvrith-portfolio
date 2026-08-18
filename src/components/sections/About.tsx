@@ -1,6 +1,7 @@
 import { heroStats, identity, type Metric } from "@/data/content";
 import Section from "@/components/ui/Section";
 import Reveal from "@/components/ui/Reveal";
+import Chip from "@/components/ui/Chip";
 
 const TILES: Metric[] = [
   ...heroStats.slice(0, 3),
@@ -21,7 +22,12 @@ export default function About() {
           <p className="text-xl leading-relaxed text-dim md:text-2xl">
             {identity.summary}
           </p>
-          <p className="mt-8 font-mono text-[12px] text-faint">
+          <div className="mt-8 flex flex-wrap gap-2">
+            {identity.interests.map((interest) => (
+              <Chip key={interest}>{interest}</Chip>
+            ))}
+          </div>
+          <p className="mt-6 font-mono text-[12px] text-faint">
             {identity.school}
           </p>
         </Reveal>

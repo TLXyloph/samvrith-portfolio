@@ -1,4 +1,5 @@
 import SignalLayer from "@/components/SignalLayer";
+import ScrollProgress from "@/components/ui/ScrollProgress";
 import Nav from "@/components/sections/Nav";
 import Hero from "@/components/sections/Hero";
 import About from "@/components/sections/About";
@@ -18,6 +19,8 @@ export default function Home() {
       >
         skip to content
       </a>
+
+      <ScrollProgress />
 
       <SignalLayer />
 

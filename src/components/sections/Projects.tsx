@@ -3,9 +3,17 @@ import Section from "@/components/ui/Section";
 import Reveal from "@/components/ui/Reveal";
 import Chip from "@/components/ui/Chip";
 import ArrowLink from "@/components/ui/ArrowLink";
+import FocusProbe, { type FocusTarget } from "@/components/ui/FocusProbe";
 
 const CARD_HOVER =
   "transition duration-300 hover:border-white/[0.16] hover:bg-white/[0.045]";
+
+/** Slugs the signal layer knows how to highlight; the literal type-checks. */
+const FOCUS_TARGETS: readonly FocusTarget[] = ["sparse-emg", "neuromcp"];
+
+function isFocusTarget(slug: string): slug is FocusTarget {
+  return (FOCUS_TARGETS as readonly string[]).includes(slug);
+}
 
 const featured = projects.filter((p) => p.featured);
 const rest = projects.filter((p) => !p.featured);
@@ -104,11 +112,19 @@ export default function Projects() {
       titleAccent="seam"
     >
       <div className="mt-12 space-y-6">
-        {featured.map((project, i) => (
-          <Reveal key={project.slug} delay={0.06 + i * 0.06}>
-            <FeaturedCard project={project} />
-          </Reveal>
-        ))}
+        {featured.map((project, i) => {
+          const card = <FeaturedCard project={project} />;
+          return (
+            <Reveal key={project.slug} delay={0.06 + i * 0.06}>
+              {/* Cards the signal layer knows how to highlight get a probe. */}
+              {isFocusTarget(project.slug) ? (
+                <FocusProbe focusId={project.slug}>{card}</FocusProbe>
+              ) : (
+                card
+              )}
+            </Reveal>
+          );
+        })}
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">

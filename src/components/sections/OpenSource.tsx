@@ -10,12 +10,16 @@ function Row({ item }: { item: Contribution }) {
       <span
         className={[
           "justify-self-start rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase",
-          merged
-            ? "border-sig-iris/40 text-sig-iris"
-            : "border-hairline text-faint",
+          merged ? "border-sig-iris/40" : "border-hairline text-faint",
         ].join(" ")}
       >
-        {item.state}
+        {merged ? (
+          <span className="liquid-metal-text text-[10.5px] font-medium uppercase">
+            {item.state}
+          </span>
+        ) : (
+          item.state
+        )}
       </span>
 
       <div className="min-w-0">
