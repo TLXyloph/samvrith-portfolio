@@ -1,12 +1,14 @@
 "use client";
 
 /**
- * /lab — art-direction surface for the SignalField ASCII canvas.
- * No page scroll: progress is driven straight into the scroll bus.
+ * /lab — art-direction surface for the SignalField "Silicon Cortex".
+ * No page scroll: progress, focus, and activation are driven straight
+ * into the scroll bus / component props.
  */
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import { setScrollProgress } from "@/components/signal/scrollBus";
+import { setScrollProgress, setFocus, type FocusId } from "@/components/signal/scrollBus";
+import type { SignalVariant } from "@/components/signal/brain";
 import CursorDot from "@/components/signal/CursorDot";
 
 const SignalField = dynamic(() => import("@/components/signal/SignalField"), {
@@ -43,25 +45,62 @@ function Slider({ label, min, max, step, value, display, onChange }: SliderProps
   );
 }
 
+function Toggle({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`border px-2 py-1 uppercase tracking-widest transition-colors ${
+        active
+          ? "border-[#a78bfa] bg-[#a78bfa]/20 text-white"
+          : "border-white/15 text-white/50 hover:text-white/80"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function LabPage() {
   const [progress, setProgress] = useState(0);
   const [cellPx, setCellPx] = useState(12);
   const [exposure, setExposure] = useState(1);
   const [underlayer, setUnderlayer] = useState(0.35);
+  const [variant, setVariant] = useState<SignalVariant>("silicon");
+  const [focus, setFocusState] = useState<FocusId>(null);
+  const [overrideOn, setOverrideOn] = useState(false);
+  const [cluster, setCluster] = useState(-1);
+
+  const applyFocus = (id: FocusId) => {
+    setFocusState(id);
+    setFocus(id);
+  };
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#050508] text-neutral-300">
       <SignalField
+        key={variant}
         externalScroll
+        variant={variant}
         cellPx={cellPx}
         exposure={exposure}
         underlayer={underlayer}
+        clusterOverride={overrideOn ? cluster : undefined}
       />
       <CursorDot />
       <div className="fixed bottom-4 left-4 z-10 w-72 space-y-3 border border-white/10 bg-black/70 p-4 font-mono text-[11px] backdrop-blur">
         <div className="flex items-baseline justify-between">
           <span className="uppercase tracking-widest text-white/80">signal / lab</span>
-          <span className="text-white/40">tuning</span>
+          <span className="text-white/40">v2 cortex</span>
+        </div>
+        <div className="flex gap-2">
+          <Toggle active={variant === "silicon"} label="silicon" onClick={() => setVariant("silicon")} />
+          <Toggle active={variant === "connectome"} label="connectome" onClick={() => setVariant("connectome")} />
+        </div>
+        <div className="flex gap-2">
+          <Toggle active={focus === "sparse-emg"} label="emg" onClick={() => applyFocus(focus === "sparse-emg" ? null : "sparse-emg")} />
+          <Toggle active={focus === "neuromcp"} label="mcp" onClick={() => applyFocus(focus === "neuromcp" ? null : "neuromcp")} />
+          <Toggle active={focus === null} label="none" onClick={() => applyFocus(null)} />
         </div>
         <Slider
           label="scroll"
@@ -75,6 +114,23 @@ export default function LabPage() {
             setScrollProgress(v);
           }}
         />
+        <div className="flex items-end gap-2">
+          <div className="grow">
+            <Slider
+              label={overrideOn ? "cluster (pinned)" : "cluster (scroll)"}
+              min={-1}
+              max={8}
+              step={1}
+              value={cluster}
+              display={overrideOn ? String(cluster) : "auto"}
+              onChange={(v) => {
+                setCluster(v);
+                setOverrideOn(true);
+              }}
+            />
+          </div>
+          <Toggle active={!overrideOn} label="auto" onClick={() => setOverrideOn(false)} />
+        </div>
         <Slider
           label="cellPx"
           min={8}
