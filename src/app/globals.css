@@ -84,29 +84,32 @@ body {
 /* ————— liquid metal: purple chrome, reserved for tiny accents only
    (the primary CTA, the `merged` badge, the scroll-progress bar) ————— */
 .liquid-metal {
+  /* darkest stops stay ≥4.5:1 against text-void, so the CTA label passes AA
+     at every phase of the sheen (and when reduced-motion parks it at 0%) */
   background-image: linear-gradient(
     115deg,
-    #3b3352 0%,
-    #8b7fd8 16%,
+    #8478cf 0%,
+    #a99cf0 16%,
     #ece7ff 30%,
-    #a78bfa 44%,
-    #4a4066 58%,
-    #9c8df0 76%,
-    #3b3352 100%
+    #b3a1fb 44%,
+    #7d71c6 58%,
+    #b0a3f4 76%,
+    #8478cf 100%
   );
   background-size: 220% 100%;
   animation: lm-sheen 7s linear infinite;
 }
 
 .liquid-metal-text {
+  /* darkest stops stay ≥4.5:1 against the void background for small text */
   background-image: linear-gradient(
     115deg,
-    #6f649c 0%,
-    #b7a8f5 22%,
+    #9488dd 0%,
+    #c3b6f8 22%,
     #f0ecff 38%,
-    #a78bfa 54%,
-    #7d6fc4 72%,
-    #6f649c 100%
+    #b3a1fb 54%,
+    #8f83d4 72%,
+    #9488dd 100%
   );
   background-size: 260% 100%;
   animation: lm-sheen 6s linear infinite;
