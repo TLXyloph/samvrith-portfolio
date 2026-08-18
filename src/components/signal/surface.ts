@@ -134,8 +134,8 @@ export function buildBrainstem(): THREE.BufferGeometry {
 
 /** UV-mapped silicon substrate: carries the painted PCB texture. */
 export function buildBackplane(): THREE.BufferGeometry {
-  const NU = 22;
-  const NV = 34;
+  const NU = 30; // finer grid → the cell staircase hugs the silhouette
+  const NV = 46;
   const positions: number[] = [];
   const colors: number[] = [];
   const uvs: number[] = [];
@@ -153,7 +153,9 @@ export function buildBackplane(): THREE.BufferGeometry {
     const fade = (1 - smoothstep(0.55, 1.0, radial(u, vv))) * 0.75 + 0.25;
     const seamFade = 0.4 + 0.6 * smoothstep(0.02, 0.3, u);
     positions.push(u, vv, shellZ(u, vv) - 0.06);
-    const s = 0.8 * fade * seamFade; // scales the painted PCB texture
+    // v4.1: emissive gain raised 0.8 → 1.3 so the painted board clearly
+    // reads through the 0.1× underlayer at hero exposure
+    const s = 1.3 * fade * seamFade;
     colors.push(s, s, s);
     uvs.push((u - PCB_U0) / (PCB_U1 - PCB_U0), (vv + PCB_V) / (2 * PCB_V));
   };

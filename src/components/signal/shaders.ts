@@ -332,7 +332,9 @@ void main(){
       float mask = texture2D(tGlyphs, vec2((cellIdx + inCell.x) / 16.0, inCell.y)).a;
       float maxc = max(c.r, max(c.g, c.b));
       vec3 chroma = c / max(maxc, 1e-4);
-      vec3 col = uVoid + under;
+      // v4.1: silicon-marked cells lift the hazy board ×1.35 so the PCB is
+      // unmistakably apparent under the micro glyphs (organic side untouched)
+      vec3 col = uVoid + under * 1.35;
       if (lum > 0.03) col += mask * chroma * (0.35 + 0.95 * lum);
       gl_FragColor = vec4(toSrgb(col * uGlobalDim), 1.0);
       return;
