@@ -1,3 +1,4 @@
+import SignalLayer from "@/components/SignalLayer";
 import Nav from "@/components/sections/Nav";
 import Hero from "@/components/sections/Hero";
 import About from "@/components/sections/About";
@@ -18,7 +19,7 @@ export default function Home() {
         skip to content
       </a>
 
-      {/* SIGNAL_FIELD_MOUNT */}
+      <SignalLayer />
 
       <Nav />
 
