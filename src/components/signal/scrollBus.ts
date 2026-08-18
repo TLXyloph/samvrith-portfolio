@@ -30,3 +30,32 @@ export function onScrollProgress(cb: Listener): () => void {
     listeners.delete(cb);
   };
 }
+
+/**
+ * Focus channel — which featured element (if any) currently owns the
+ * scene highlight. Published by an IntersectionObserver in the DOM layer
+ * ("sparse-emg" | "neuromcp" | null); consumed by SignalField per frame.
+ */
+export type FocusId = "sparse-emg" | "neuromcp" | null;
+
+type FocusListener = (id: FocusId) => void;
+
+let focus: FocusId = null;
+const focusListeners = new Set<FocusListener>();
+
+export function setFocus(id: FocusId): void {
+  if (id === focus) return;
+  focus = id;
+  for (const listener of focusListeners) listener(focus);
+}
+
+export function getFocus(): FocusId {
+  return focus;
+}
+
+export function onFocus(cb: FocusListener): () => void {
+  focusListeners.add(cb);
+  return () => {
+    focusListeners.delete(cb);
+  };
+}

@@ -81,8 +81,52 @@ body {
   );
 }
 
+/* ————— liquid metal: purple chrome, reserved for tiny accents only
+   (the primary CTA, the `merged` badge, the scroll-progress bar) ————— */
+.liquid-metal {
+  background-image: linear-gradient(
+    115deg,
+    #3b3352 0%,
+    #8b7fd8 16%,
+    #ece7ff 30%,
+    #a78bfa 44%,
+    #4a4066 58%,
+    #9c8df0 76%,
+    #3b3352 100%
+  );
+  background-size: 220% 100%;
+  animation: lm-sheen 7s linear infinite;
+}
+
+.liquid-metal-text {
+  background-image: linear-gradient(
+    115deg,
+    #6f649c 0%,
+    #b7a8f5 22%,
+    #f0ecff 38%,
+    #a78bfa 54%,
+    #7d6fc4 72%,
+    #6f649c 100%
+  );
+  background-size: 260% 100%;
+  animation: lm-sheen 6s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes lm-sheen {
+  to {
+    background-position: -220% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  .liquid-metal,
+  .liquid-metal-text {
+    animation: none;
   }
 }

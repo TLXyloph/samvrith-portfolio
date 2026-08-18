@@ -38,13 +38,21 @@ export const identity = {
   thesis: "from microvolts to meaning",
   eyebrow: "~/saratoga-ca → ~/west-lafayette-in",
   headline:
-    "I build the whole signal chain — analog front-ends I design from scratch, models I train and quantize, agents that act on what they decode.",
+    "Neuromorphic computing, agentic AI, and the biosignal interfaces between them — spiking-network tooling, custom sensor hardware, and agents that act on what they decode.",
   summary:
-    "Electrical engineering student entering Purdue with junior standing. I design sensor PCBs from schematic through fab release, deploy neural networks on-device, and wire cognition into agent interfaces. I contribute to open-source spiking-neural-network and agent-infrastructure libraries, and I coach competitive robotics.",
+    "My work runs along one seam. Neuromorphic computing: spiking networks and the synaptic-operation accounting that justifies them, contributed upstream to norse and SpikingJelly. Agentic AI: MCP servers, tool interfaces, and machine-enforced release gates. And the biosignal layer that connects the two — EMG and EEG front-ends I design from schematic through fab release, with the models deployed on-device. Entering Purdue ECE with junior standing; I also coach competitive robotics.",
   email: "samvrith@gmail.com",
   github: "https://github.com/TLXyloph",
   githubHandle: "TLXyloph",
   school: "Purdue ECE · Fall 2026 · junior standing",
+  interests: [
+    "neuromorphic computing",
+    "agentic AI",
+    "biosignal interfaces",
+    "on-device ML",
+    "analog front-end design",
+    "open-source infrastructure",
+  ],
 };
 
 export const heroStats: Metric[] = [
