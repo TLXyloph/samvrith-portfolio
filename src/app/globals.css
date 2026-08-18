@@ -100,6 +100,14 @@ body {
   }
 }
 
+/* running animations outrank hover declarations — drop the animation on
+   hover so the steady hover state can apply */
+.breathe:hover {
+  animation: none;
+  border-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(167, 139, 250, 0.08);
+}
+
 /* scroll-progress fill: a quiet static signal gradient */
 .signal-bar {
   background: linear-gradient(90deg, #8b9cf5, #a78bfa 55%, #f472b6);
