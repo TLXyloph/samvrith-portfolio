@@ -57,6 +57,7 @@ export class SpikeSystem {
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      depthTest: false, // v3: spikes glow through the solid brain surface
     });
     const mesh = new THREE.InstancedMesh(this.geo, this.mat, CAP);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

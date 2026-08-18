@@ -5,10 +5,12 @@
  * useFrame callbacks (rAF loop), never during render. */
 
 /**
- * Pointer motes — discreet glyph dust shed by the cursor (replaces the v1
- * sparks). Emits at most ~12/s while the pointer moves, long-lived slow
- * drifters at LOW luminance (ramp index 1–3), gentle alpha ease in/out.
- * No emission on coarse pointers or reduced motion.
+ * Pointer motes v3 — ASCII citizens. Each mote is sized ≈1 coarse cell at
+ * its depth so it reads as ONE character; its luminance decays through the
+ * whole ramp over its life (x → + → = → : → .) with a subtle ±1-tier
+ * flicker (~3 Hz) for a shifting-character shimmer. Emits ~14/s while the
+ * pointer moves, life 2.5–5 s, slow upward drift, cap 48. No emission on
+ * coarse pointers or reduced motion.
  */
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -16,9 +18,10 @@ import * as THREE from "three";
 import { SPARK_VERT, SPARK_FRAG } from "./shaders";
 import type { FieldState } from "./state";
 
-const MAX = 40;
+const MAX = 48;
 const EMIT_PLANE_Z = 2;
-const MIN_INTERVAL = 0.085; // s between emissions (≈≤12/s)
+const MIN_INTERVAL = 0.071; // s between emissions (≈14/s)
+const TAN_HALF_FOV = Math.tan((42 * Math.PI) / 360);
 
 interface MoteAssets {
   mesh: THREE.InstancedMesh;
@@ -27,6 +30,7 @@ interface MoteAssets {
   age: Float32Array;
   life: Float32Array;
   size: Float32Array;
+  phase: Float32Array;
   dispose: () => void;
 }
 
@@ -36,7 +40,7 @@ function buildMotes(): MoteAssets {
     vertexShader: SPARK_VERT,
     fragmentShader: SPARK_FRAG,
     transparent: true,
-    blending: THREE.AdditiveBlending, // dim colors — reads as soft dust, no flare
+    blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   const mesh = new THREE.InstancedMesh(geo, mat, MAX);
@@ -45,6 +49,7 @@ function buildMotes(): MoteAssets {
   mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
   mesh.frustumCulled = false;
   mesh.renderOrder = 9;
+  mesh.layers.set(1); // glyph citizen: rendered after the underlayer blit
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   for (let i = 0; i < MAX; i++) mesh.setMatrixAt(i, zero);
   mesh.instanceMatrix.needsUpdate = true;
@@ -55,6 +60,7 @@ function buildMotes(): MoteAssets {
     age: new Float32Array(MAX).fill(99),
     life: new Float32Array(MAX).fill(1),
     size: new Float32Array(MAX),
+    phase: new Float32Array(MAX),
     dispose: () => {
       geo.dispose();
       mat.dispose();
@@ -78,7 +84,7 @@ export function Motes({ fs }: { fs: FieldState }) {
 
   useFrame((state, delta) => {
     const dt = Math.min(Math.max(delta, 0), 0.05);
-    const { mesh, pos, vel, age, life, size } = assets;
+    const { mesh, pos, vel, age, life, size, phase } = assets;
 
     // — emission: only while the pointer is actually moving —
     const moving = fs.pointerActive && fs.pointerSpeed > 40;
@@ -101,8 +107,12 @@ export function Motes({ fs }: { fs: FieldState }) {
         vel[j + 1] = Math.abs(Math.sin(ang)) * speed * 0.6 + speed * 0.4;
         vel[j + 2] = (Math.random() - 0.5) * speed * 0.3;
         age[i] = 0;
-        life[i] = 3 + Math.random() * 3;
-        size[i] = 0.015 + Math.random() * 0.01;
+        life[i] = 2.5 + Math.random() * 2.5;
+        phase[i] = Math.random() * Math.PI * 2;
+        // ≈1 coarse cell at this depth → the mote IS one character
+        const dist = t; // ray length ≈ camera distance to the emit plane
+        const cellWorld = (fs.cellPx / Math.max(1, state.size.height)) * 2 * TAN_HALF_FOV * dist;
+        size[i] = cellWorld * (0.85 + Math.random() * 0.2);
       }
     }
 
@@ -118,12 +128,15 @@ export function Motes({ fs }: { fs: FieldState }) {
         pos[j + 1] += vel[j + 1] * dt;
         pos[j + 2] += vel[j + 2] * dt;
         const lt = Math.min(age[i] / life[i], 1);
-        // gentle ease-in/out alpha envelope
-        const env = Math.min(1, lt / 0.15) * Math.min(1, (1 - lt) / 0.3);
+        // luminance walks DOWN the whole ramp: start ~tier 6–7 → blank,
+        // with a ±1-tier flicker at ~3 Hz
+        const easeIn = Math.min(1, lt / 0.08);
+        const decay = Math.pow(1 - lt, 1.6);
+        const flicker = 1 + 0.16 * Math.sin(fs.time * 19 + phase[i]);
+        const b = 4.5 * easeIn * decay * flicker;
         m.set(size[i], 0, 0, pos[j], 0, size[i], 0, pos[j + 1], 0, 0, size[i], pos[j + 2], 0, 0, 0, 1);
         mesh.setMatrixAt(i, m);
-        // LOW luminance — must land ramp index 1–3 after cell dilution
-        c.copy(COL_A).lerp(COL_B, lt).multiplyScalar(0.8 * env);
+        c.copy(COL_A).lerp(COL_B, lt).multiplyScalar(b);
         colors.setXYZ(i, c.r, c.g, c.b);
       } else if (age[i] < 98) {
         age[i] = 99;

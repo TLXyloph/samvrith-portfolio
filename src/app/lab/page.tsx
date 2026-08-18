@@ -63,9 +63,12 @@ function Toggle({ active, label, onClick }: { active: boolean; label: string; on
 
 export default function LabPage() {
   const [progress, setProgress] = useState(0);
-  const [cellPx, setCellPx] = useState(12);
+  const [cellPx, setCellPx] = useState(14);
   const [exposure, setExposure] = useState(1);
-  const [underlayer, setUnderlayer] = useState(0.35);
+  const [underlayer, setUnderlayer] = useState(0.5);
+  const [rippleGain, setRippleGain] = useState(2.5);
+  const [glyphMin, setGlyphMin] = useState(0.78);
+  const [glyphGain, setGlyphGain] = useState(0.4);
   const [variant, setVariant] = useState<SignalVariant>("silicon");
   const [focus, setFocusState] = useState<FocusId>(null);
   const [overrideOn, setOverrideOn] = useState(false);
@@ -85,6 +88,9 @@ export default function LabPage() {
         cellPx={cellPx}
         exposure={exposure}
         underlayer={underlayer}
+        rippleGain={rippleGain}
+        glyphMin={glyphMin}
+        glyphGain={glyphGain}
         clusterOverride={overrideOn ? cluster : undefined}
       />
       <CursorDot />
@@ -157,6 +163,33 @@ export default function LabPage() {
           value={underlayer}
           display={underlayer.toFixed(2)}
           onChange={setUnderlayer}
+        />
+        <Slider
+          label="rippleGain"
+          min={0}
+          max={4}
+          step={0.05}
+          value={rippleGain}
+          display={rippleGain.toFixed(2)}
+          onChange={setRippleGain}
+        />
+        <Slider
+          label="glyphMin"
+          min={0.5}
+          max={1}
+          step={0.01}
+          value={glyphMin}
+          display={glyphMin.toFixed(2)}
+          onChange={setGlyphMin}
+        />
+        <Slider
+          label="glyphGain"
+          min={0}
+          max={0.8}
+          step={0.01}
+          value={glyphGain}
+          display={glyphGain.toFixed(2)}
+          onChange={setGlyphGain}
         />
       </div>
     </main>

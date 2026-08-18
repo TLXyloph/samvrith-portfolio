@@ -5,23 +5,30 @@
  * useFrame callbacks (rAF loop), never during render. */
 
 /**
- * Cortex — the v2 scene: organic brain point cloud (glyph dust), dim
- * synapse edges, the Manhattan-trace silicon hemisphere (display + an
- * isolated orientation-ID scene for the dual-res ASCII pass), the spike
- * system, and the starfield. All PRE-quantization.
+ * Cortex — the v3 scene: a SOLID luminous wrinkled brain surface (the
+ * flower formula: lambert-wrap + fresnel rim + hue ramp) with a light
+ * cortical point sprinkle, dim synapse edges, the Manhattan-trace silicon
+ * hemisphere over a hazy substrate backplane (display + an isolated
+ * orientation-ID scene for the dual-res ASCII pass), the spike system,
+ * and a starfield of glyph-sized quads. All PRE-quantization.
  */
 import { useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import {
+  BRAIN_VERT,
+  BRAIN_FRAG,
   POINT_VERT,
   POINT_FRAG,
   TRACE_VERT,
   TRACE_FRAG,
   TRACE_ID_VERT,
   TRACE_ID_FRAG,
+  STAR_VERT,
+  STAR_FRAG,
 } from "./shaders";
-import { createStarGeometry, type BrainData } from "./brain";
+import { createStarPositions, mulberry32, STAR_COUNT, type BrainData } from "./brain";
+import { buildBrainSurface, buildBackplane } from "./surface";
 import { SpikeSystem } from "./Spikes";
 import type { FieldState } from "./state";
 
@@ -30,8 +37,10 @@ interface CortexAssets {
   brainRig: THREE.Group;
   spin: THREE.Group;
   starRig: THREE.Group;
+  brainMat: THREE.ShaderMaterial;
   pointsMat: THREE.ShaderMaterial;
   traceMat: THREE.ShaderMaterial | null;
+  starMat: THREE.ShaderMaterial;
   idScene: THREE.Scene | null;
   idGroup: THREE.Group | null;
   spikes: SpikeSystem;
@@ -42,6 +51,32 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
   const rig = new THREE.Group();
   const spin = new THREE.Group();
   rig.add(spin);
+
+  // — the solid luminous brain surface (carries the image) —
+  const brainGeo = buildBrainSurface(data.variant);
+  const brainMat = new THREE.ShaderMaterial({
+    vertexShader: BRAIN_VERT,
+    fragmentShader: BRAIN_FRAG,
+    side: THREE.DoubleSide,
+    uniforms: {
+      uTime: { value: 0 },
+      uPulse: { value: 0 },
+      uSync: { value: 0 },
+      uRipple: { value: 0 },
+      uWavePhase: { value: -1.6 },
+      uRampDiv: { value: data.variant === "silicon" ? 1.45 : 2.7 },
+      uClipX: { value: data.variant === "silicon" ? -0.03 : 1000 },
+      uClusterAct: { value: fs.clusterAct },
+      uAccent: { value: new THREE.Color("#8b9cf5") },
+      uColA: { value: new THREE.Color("#8b9cf5") },
+      uColB: { value: new THREE.Color("#a78bfa") },
+      uColC: { value: new THREE.Color("#f472b6") },
+      uColRim: { value: new THREE.Color("#c4b5fd") },
+    },
+  });
+  const brainMesh = new THREE.Mesh(brainGeo, brainMat);
+  brainMesh.frustumCulled = false;
+  spin.add(brainMesh);
 
   // — organic point cloud —
   const pgeo = new THREE.BufferGeometry();
@@ -54,6 +89,7 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
     transparent: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    depthTest: false, // sprinkle glitters over the solid body
     uniforms: {
       uTime: { value: 0 },
       uPulse: { value: 0 },
@@ -95,7 +131,16 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
   let idGroup: THREE.Group | null = null;
   let sgeo: THREE.BufferGeometry | null = null;
   let idMat: THREE.ShaderMaterial | null = null;
+  let backGeo: THREE.BufferGeometry | null = null;
+  let backMat: THREE.MeshBasicMaterial | null = null;
   if (data.silicon) {
+    // hazy PCB-substrate glow behind the traces (underlayer body)
+    backGeo = buildBackplane();
+    backMat = new THREE.MeshBasicMaterial({ vertexColors: true, depthWrite: false });
+    const back = new THREE.Mesh(backGeo, backMat);
+    back.frustumCulled = false;
+    spin.add(back);
+
     sgeo = new THREE.BufferGeometry();
     sgeo.setAttribute("position", new THREE.BufferAttribute(data.silicon.positions, 3));
     sgeo.setAttribute("aOrient", new THREE.BufferAttribute(data.silicon.orients, 1));
@@ -107,6 +152,8 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
       uniforms: {
         uTime: { value: 0 },
         uSync: { value: 0 },
+        uRipple: { value: 0 },
+        uWavePhase: { value: -1.6 },
         uClusterAct: { value: fs.clusterAct },
         uAccent: { value: new THREE.Color("#8b9cf5") },
         uTraceCol: { value: new THREE.Color("#96a3cf") },
@@ -136,21 +183,40 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
   const spikes = new SpikeSystem(data);
   spin.add(spikes.mesh);
 
-  // — starfield (coordinator-tuned material, unchanged) —
+  // — starfield: glyph-sized quads, each star IS a dim ramp character —
   const starRig = new THREE.Group();
-  const starGeo = createStarGeometry();
-  const starMat = new THREE.PointsMaterial({
-    // full-cell coverage at low luminance: the 4-tap average then lands on
-    // the dimmest glyphs (`.`/`:`) crisply, while the blurred underlayer
-    // contribution of so dim a point stays invisible (tiny-but-bright
-    // points do the opposite — blank glyphs plus gray underlayer blobs)
-    color: new THREE.Color("#4c5478"),
-    size: 7,
-    sizeAttenuation: false,
+  const starGeo = new THREE.PlaneGeometry(1, 1);
+  const starMat = new THREE.ShaderMaterial({
+    vertexShader: STAR_VERT,
+    fragmentShader: STAR_FRAG,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
     depthWrite: false,
+    uniforms: { uStarK: { value: 0.01 } },
   });
-  const stars = new THREE.Points(starGeo, starMat);
+  const stars = new THREE.InstancedMesh(starGeo, starMat, STAR_COUNT);
+  {
+    const positions = createStarPositions(STAR_COUNT);
+    const srand = mulberry32(7707);
+    const m = new THREE.Matrix4();
+    const cA = new THREE.Color("#aeb6e6");
+    const cB = new THREE.Color("#8b9cf5");
+    const c = new THREE.Color();
+    stars.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(STAR_COUNT * 3), 3);
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const s = 0.85 + srand() * 0.3; // relative size jitter (shader scales)
+      m.set(s, 0, 0, positions[i * 3], 0, s, 0, positions[i * 3 + 1], 0, 0, s, positions[i * 3 + 2], 0, 0, 0, 1);
+      stars.setMatrixAt(i, m);
+      // luminance targets ramp index 2–4; a few land 5–6
+      const bright = srand() < 0.08 ? 1.8 + srand() * 0.4 : 0.7 + srand() * 0.55;
+      c.copy(cA).lerp(cB, srand()).multiplyScalar(bright);
+      stars.instanceColor.setXYZ(i, c.r, c.g, c.b);
+    }
+    stars.instanceMatrix.needsUpdate = true;
+    stars.instanceColor.needsUpdate = true;
+  }
   stars.frustumCulled = false;
+  stars.layers.set(1); // glyph citizens: rendered after the underlayer blit
   starRig.add(stars);
 
   const root = new THREE.Group();
@@ -162,12 +228,16 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
     brainRig: rig,
     spin,
     starRig,
+    brainMat,
     pointsMat,
     traceMat,
+    starMat,
     idScene,
     idGroup,
     spikes,
     dispose: () => {
+      brainGeo.dispose();
+      brainMat.dispose();
       pgeo.dispose();
       pointsMat.dispose();
       egeo.dispose();
@@ -175,9 +245,12 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
       sgeo?.dispose();
       traceMat?.dispose();
       idMat?.dispose();
+      backGeo?.dispose();
+      backMat?.dispose();
       spikes.dispose();
       starGeo.dispose();
       starMat.dispose();
+      stars.dispose();
     },
   };
 }
@@ -195,7 +268,7 @@ export function Cortex({ fs, data }: { fs: FieldState; data: BrainData }) {
     };
   }, [fs, assets]);
 
-  useFrame(() => {
+  useFrame((state) => {
     const inner = assets.brainRig;
     inner.position.copy(fs.objPos);
     inner.scale.setScalar(fs.objScale);
@@ -210,18 +283,32 @@ export function Cortex({ fs, data }: { fs: FieldState; data: BrainData }) {
     }
     assets.starRig.rotation.y = fs.camYaw * 0.3;
 
+    const bu = assets.brainMat.uniforms;
+    bu.uTime.value = fs.time;
+    bu.uPulse.value = fs.pulse;
+    bu.uSync.value = fs.sync;
+    bu.uRipple.value = fs.rippleAmp;
+    bu.uWavePhase.value = fs.wavePhase;
+    (bu.uAccent.value as THREE.Color).copy(fs.accent);
+
     const pu = assets.pointsMat.uniforms;
     pu.uTime.value = fs.time;
     pu.uPulse.value = fs.pulse;
     pu.uSync.value = fs.sync;
-    pu.uPointPx.value = fs.cellPx * gl.getPixelRatio() * 0.6; // ≈1 coarse cell in RT0
+    pu.uPointPx.value = fs.cellPx * gl.getPixelRatio() * 0.6 * 0.55; // sub-cell sprinkle
     (pu.uAccent.value as THREE.Color).copy(fs.accent);
     if (assets.traceMat) {
       const tu = assets.traceMat.uniforms;
       tu.uTime.value = fs.time;
       tu.uSync.value = fs.sync;
+      tu.uRipple.value = fs.rippleAmp;
+      tu.uWavePhase.value = fs.wavePhase;
       (tu.uAccent.value as THREE.Color).copy(fs.accent);
     }
+    // each star ≈ a coarse cell at its depth (slightly over, so whichever
+    // cell it lands in reliably samples it as one dim character)
+    assets.starMat.uniforms.uStarK.value =
+      1.3 * (fs.cellPx / Math.max(1, state.size.height)) * 2 * Math.tan((42 * Math.PI) / 360);
 
     // keep the ID hemisphere glued to the display hemisphere
     if (assets.idGroup) {

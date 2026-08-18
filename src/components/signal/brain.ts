@@ -53,7 +53,7 @@ function vnoise(x: number, y: number, z: number): number {
   return lerp(lerp(c00, c10, v), lerp(c01, c11, v), w);
 }
 
-function fbm3(x: number, y: number, z: number): number {
+export function fbm3(x: number, y: number, z: number): number {
   return (
     vnoise(x, y, z) * 0.5 +
     vnoise(x * 2.07, y * 2.07, z * 2.07) * 0.3 +
@@ -93,7 +93,7 @@ function insideBrain(x: number, y: number, z: number): boolean {
   return cb <= 1 && cb >= 0.3;
 }
 
-function clusterOf(x: number, y: number, z: number): number {
+export function clusterOf(x: number, y: number, z: number): number {
   if (cerebellumQ(x, y, z) <= 1) return 4; // cerebellum → deep/stem
   if (brainQ(x, y, z) < 0.62) return 4; // core → deep/stem
   if (z > 0.42) return 0; // frontal
@@ -203,7 +203,7 @@ function inSilhouette(ix: number, iy: number): boolean {
   const v = cellV(iy) / 1.0;
   return u * u + v * v <= 1;
 }
-function shellZ(u: number, v: number): number {
+export function shellZ(u: number, v: number): number {
   const q = 1 - (u / 1.55) * (u / 1.55) - (v / 1.25) * (v / 1.25);
   return 0.42 * Math.sqrt(Math.max(q, 0.0001)) - 0.05;
 }
@@ -438,24 +438,26 @@ export interface BrainData {
 }
 
 export function buildBrainData(variant: SignalVariant): BrainData {
+  // v3: the solid surface mesh carries the image — the cloud is only a
+  // light cortical sprinkle + the anchor set for synapse edges.
   if (variant === "connectome") {
-    const cloud = buildBrainCloud(2400, null, 1013);
+    const cloud = buildBrainCloud(900, null, 1013);
     return { variant, cloud, edges: buildEdges(cloud, 180, 2027), silicon: null };
   }
   // silicon: organic LEFT hemisphere (viewer's left = −x), silicon right
-  const cloud = buildBrainCloud(1300, (x) => x <= -0.03, 1013);
+  const cloud = buildBrainCloud(550, (x) => x <= -0.03, 1013);
   return { variant, cloud, edges: buildEdges(cloud, 180, 2027), silicon: buildSilicon(3301) };
 }
 
-/* ————— starfield (unchanged from v1, coordinator-tuned material lives in Cortex) ————— */
+/* ————— starfield positions (v3 renders them as glyph-sized quads) ————— */
 
-export const STAR_COUNT = 250;
+export const STAR_COUNT = 180;
 
-export function createStarGeometry(): THREE.BufferGeometry {
+export function createStarPositions(count: number): Float32Array {
   const rand = mulberry32(9001);
-  const positions = new Float32Array(STAR_COUNT * 3);
+  const positions = new Float32Array(count * 3);
   const v = new THREE.Vector3();
-  for (let i = 0; i < STAR_COUNT; i++) {
+  for (let i = 0; i < count; i++) {
     v.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1);
     if (v.lengthSq() < 1e-6) v.set(0, 0, -1);
     v.normalize().multiplyScalar(12 + rand() * 18);
@@ -464,7 +466,5 @@ export function createStarGeometry(): THREE.BufferGeometry {
     positions[i * 3 + 1] = v.y;
     positions[i * 3 + 2] = v.z;
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  return geo;
+  return positions;
 }

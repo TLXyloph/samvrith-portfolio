@@ -20,6 +20,76 @@ float clusterAct(float id){
 }
 `;
 
+/**
+ * v3 — the solid luminous brain surface (the flower formula resurrected):
+ * lambert-wrap + fresnel rim emissive + long-axis hue ramp + backface
+ * dimming, with cluster activation, contact synchrony, the pulse breath,
+ * and the scroll ripple band.
+ */
+export const BRAIN_VERT = /* glsl */ `
+uniform float uRipple;
+uniform float uWavePhase;
+attribute float aCluster;
+varying vec3 vN;
+varying vec3 vViewPos;
+varying float vX;
+varying float vAct;
+varying float vRipple;
+${CLUSTER_ACT}
+void main(){
+  vAct = clusterAct(aCluster);
+  vX = position.x;
+  float band = exp(-pow((position.x - uWavePhase) * 3.2, 2.0));
+  vRipple = uRipple * band;
+  vN = normalize(normalMatrix * normal);
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vViewPos = mv.xyz;
+  gl_Position = projectionMatrix * mv;
+}
+`;
+
+export const BRAIN_FRAG = /* glsl */ `
+uniform float uPulse;
+uniform float uRampDiv; // long-axis span (2.7 full brain, 1.45 half)
+uniform float uClipX;   // planar seam cut (silicon: −0.03; connectome: off)
+uniform vec3 uAccent;
+uniform vec3 uColA;
+uniform vec3 uColB;
+uniform vec3 uColC;
+uniform vec3 uColRim;
+varying vec3 vN;
+varying vec3 vViewPos;
+varying float vX;
+varying float vAct;
+varying float vRipple;
+void main(){
+  if (vX > uClipX) discard; // crisp seam edge
+  float t = clamp((vX + 1.35) / uRampDiv, 0.0, 1.0);
+  vec3 ramp = mix(uColA, uColB, smoothstep(0.0, 0.55, t));
+  ramp = mix(ramp, uColC, smoothstep(0.5, 1.0, t));
+  vec3 N = normalize(vN);
+  if (!gl_FrontFacing) N = -N;
+  // fixed camera-space light, upper-left, lambert wrap 0.5
+  vec3 L = normalize(vec3(-0.55, 0.65, 0.52));
+  float ndl = clamp((dot(N, L) + 0.5) / 1.5, 0.0, 1.0);
+  vec3 col = ramp * (0.24 + 0.80 * ndl);
+  if (!gl_FrontFacing) col *= 0.4; // fake translucency
+  // fresnel rim as emissive — draws the ASCII silhouette
+  vec3 V = normalize(-vViewPos);
+  float fres = pow(1.0 - abs(dot(N, V)), 2.2) * 1.15;
+  col += uColRim * fres;
+  // keep the body in the mid-high ramp (= + x #) so characters read as
+  // letterforms; only rim/highlights touch the top tiers
+  col *= 0.64;
+  col = mix(col, uAccent, 0.45 * vAct);
+  col *= 1.0 + 0.7 * vAct;
+  col *= 1.0 + 0.20 * uPulse;
+  col += uAccent * vRipple * 0.4;   // scroll ripple band
+  col *= 1.0 + 0.7 * vRipple;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
 export const POINT_VERT = /* glsl */ `
 uniform float uPointPx;   // desired point size in RT0 physical px at z≈7
 uniform float uPulse;
@@ -36,7 +106,7 @@ void main(){
   float shimmer = 0.9 + 0.18 * sin(uTime * (0.7 + aRand * 1.6) + aRand * 31.0);
   vec3 base = mix(uColA, uColB, aRand);
   vec3 col = mix(base, uAccent, 0.45 * act); // hue pulled toward the accent
-  float b = (0.16 + 0.34 * act) * shimmer * (1.0 + 0.22 * uPulse);
+  float b = (0.09 + 0.22 * act) * shimmer * (1.0 + 0.22 * uPulse); // sprinkle only — the mesh carries the image
   vColor = col * b;
   gl_Position = projectionMatrix * mv;
   gl_PointSize = uPointPx * (7.0 / max(-mv.z, 0.5));
@@ -56,14 +126,17 @@ void main(){
 export const TRACE_VERT = /* glsl */ `
 uniform vec3 uAccent;
 uniform vec3 uTraceCol;
+uniform float uRipple;
+uniform float uWavePhase;
 attribute float aOrient;
 attribute float aBlock;
 varying vec3 vColor;
 ${CLUSTER_ACT}
 void main(){
   float act = clusterAct(aBlock);
-  vec3 col = mix(uTraceCol, uAccent, 0.35 * act);
-  float b = 0.34 + 0.55 * act;
+  float band = exp(-pow((position.x - uWavePhase) * 3.2, 2.0)) * uRipple;
+  vec3 col = mix(uTraceCol, uAccent, min(1.0, 0.35 * act + 0.5 * band));
+  float b = (0.34 + 0.55 * act) * (1.0 + 1.0 * band); // ripple lights cells as it passes
   if (aOrient > 0.6) b *= 1.4; // junctions/vias pop slightly
   vColor = col * b;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -91,6 +164,46 @@ export const TRACE_ID_FRAG = /* glsl */ `
 varying float vOrient;
 void main(){
   gl_FragColor = vec4(vOrient, 0.0, 0.0, 1.0);
+}
+`;
+
+/**
+ * Starfield quads: screen-proportional sizing so each star covers ≈0.9
+ * coarse cell at its depth and reads as a single dim ramp character.
+ */
+export const STAR_VERT = /* glsl */ `
+uniform float uStarK; // world size per unit view depth for ≈0.9 coarse cell
+varying vec2 vUv;
+varying vec3 vColor;
+void main(){
+  vUv = uv;
+  #ifdef USE_INSTANCING_COLOR
+    vColor = instanceColor;
+  #else
+    vColor = vec3(1.0);
+  #endif
+  #ifdef USE_INSTANCING
+    vec4 mv = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+    float jitter = length(vec3(instanceMatrix[0]));
+  #else
+    vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+    float jitter = 1.0;
+  #endif
+  float s = uStarK * max(-mv.z, 1.0) * jitter;
+  mv.xy += position.xy * s;
+  gl_Position = projectionMatrix * mv;
+}
+`;
+
+/** Flat-ish falloff so the coarse-cell taps reliably sample a star. */
+export const STAR_FRAG = /* glsl */ `
+varying vec2 vUv;
+varying vec3 vColor;
+void main(){
+  float d = length(vUv - 0.5);
+  float a = smoothstep(0.5, 0.3, d);
+  if (a <= 0.001) discard;
+  gl_FragColor = vec4(vColor * a, 1.0);
 }
 `;
 
@@ -171,6 +284,8 @@ uniform float uExposure;
 uniform float uContrast;
 uniform float uUnderlayer;
 uniform float uGlobalDim;
+uniform float uGlyphMin;   // variable glyph size: scale = min + gain·tier
+uniform float uGlyphGain;
 uniform vec3 uVoid;
 
 vec3 aces(vec3 x){
@@ -221,19 +336,24 @@ void main(){
     }
   }
 
-  // organic macro path (luminance-ramp glyphs)
+  // organic macro path (luminance-ramp glyphs, luminance-scaled size:
+  // dim cells draw small characters, bright cells draw big ones)
   vec2 cell = floor(gl_FragCoord.xy / cellSize);
   vec2 centerPx = (cell + 0.5) * cellSize;
   vec3 c = cellColor(cellSize, centerPx);
   float lum = dot(c, vec3(0.2126, 0.7152, 0.0722)) * uExposure;
   lum = clamp(0.5 + (lum - 0.5) * uContrast, 0.0, 1.0);
   int index = int(clamp(floor(lum * 10.0), 0.0, 9.0));
-  vec2 inCell = fract(gl_FragCoord.xy / cellSize);
-  vec2 atlasUV = vec2((float(index) + inCell.x) / 16.0, inCell.y);
-  float mask = texture2D(tGlyphs, atlasUV).a;
+  float gs = clamp(uGlyphMin + uGlyphGain * (float(index) / 9.0), 0.3, 1.35);
+  vec2 inCell = (fract(gl_FragCoord.xy / cellSize) - 0.5) / gs + 0.5;
+  float mask = 0.0;
+  if (inCell.x >= 0.0 && inCell.x <= 1.0 && inCell.y >= 0.0 && inCell.y <= 1.0) {
+    mask = texture2D(tGlyphs, vec2((float(index) + inCell.x) / 16.0, inCell.y)).a;
+  }
   float maxc = max(c.r, max(c.g, c.b));
   vec3 chroma = c / max(maxc, 1e-4); // preserve scene chroma
-  vec3 glyphRGB = chroma * (0.35 + 0.65 * (float(index) / 9.0));
+  // brighter than the haze underneath — the characters must POP
+  vec3 glyphRGB = chroma * (0.5 + 0.85 * (float(index) / 9.0));
   vec3 col = uVoid + under;
   if (index > 0) col += mask * glyphRGB;
   col *= uGlobalDim;

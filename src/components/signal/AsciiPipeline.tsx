@@ -59,8 +59,10 @@ function buildPack() {
       uCellSize: { value: 24 },
       uExposure: { value: 1 },
       uContrast: { value: 1.12 },
-      uUnderlayer: { value: 0.35 },
+      uUnderlayer: { value: 0.5 },
       uGlobalDim: { value: 1 },
+      uGlyphMin: { value: 0.78 },
+      uGlyphGain: { value: 0.4 },
       uVoid: { value: new THREE.Color(VOID_HEX) },
     },
     depthTest: false,
@@ -244,20 +246,36 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
     u.uContrast.value = fs.contrast;
     u.uUnderlayer.value = fs.underlayer;
     u.uGlobalDim.value = fs.globalDim;
+    u.uGlyphMin.value = fs.glyphMin;
+    u.uGlyphGain.value = fs.glyphGain;
 
-    // Pass A: scene → RT0
+    // Pass A: scene (layer 0 — the cohesive bodies) → RT0
+    camera.layers.set(0);
     gl.setRenderTarget(t.rt0);
     gl.render(scene, camera);
+    // Pass A2: RT0 → RT1 BEFORE the glyph citizens, so stars/motes never
+    // blob into the soft underlayer — they exist only as characters
+    pack.blitMat.uniforms.tSrc.value = t.rt0.texture;
+    pack.mesh.material = pack.blitMat;
+    gl.setRenderTarget(t.rt1);
+    gl.render(pack.fsScene, pack.cam);
+    // Pass A1: glyph citizens (layer 1: stars, motes) added into RT0.
+    // Background must be nulled: a Color background FORCES a clear even
+    // with autoClear=false and would wipe the pass-A image.
+    const bg = scene.background;
+    scene.background = null;
+    camera.layers.set(1);
+    gl.autoClear = false;
+    gl.setRenderTarget(t.rt0);
+    gl.render(scene, camera);
+    gl.autoClear = true;
+    camera.layers.set(0);
+    scene.background = bg;
     // Pass ID: silicon orientation codes → RT_ID (silicon variant only)
     if (fs.idScene) {
       gl.setRenderTarget(t.rtId);
       gl.render(fs.idScene, camera);
     }
-    // Pass A2: RT0 → RT1
-    pack.blitMat.uniforms.tSrc.value = t.rt0.texture;
-    pack.mesh.material = pack.blitMat;
-    gl.setRenderTarget(t.rt1);
-    gl.render(pack.fsScene, pack.cam);
     // Pass B: ASCII quantization to screen
     pack.mesh.material = pack.asciiMat;
     gl.setRenderTarget(null);

@@ -17,10 +17,12 @@
  *
  * Props (all optional): externalScroll (skip the internal window-scroll
  * fallback; drive progress via scrollBus/Lenis instead), cellPx (glyph cell
- * size in CSS px — default 12 fine-pointer / 14 coarse), exposure (base
+ * size in CSS px — default 14 fine-pointer / 16 coarse), exposure (base
  * multiplier, default 1), underlayer (soft color bed strength, default
- * 0.35), variant ("silicon" default | "connectome"; `?variant=a` in the URL
- * overrides to "connectome"), clusterOverride (lab: pin activation −1..8).
+ * 0.5), variant ("silicon" default | "connectome"; `?variant=a` in the URL
+ * overrides to "connectome"), clusterOverride (lab: pin activation −1..8),
+ * rippleGain (scroll-ripple sensitivity, default 2.5), glyphMin/glyphGain
+ * (variable glyph size: scale = min + gain·tier, defaults 0.78/0.4).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -58,6 +60,12 @@ export interface SignalFieldProps {
   variant?: SignalVariant;
   /** Lab: pin the active cluster (−1 resting .. 8); undefined = scroll-driven. */
   clusterOverride?: number;
+  /** Scroll-ripple sensitivity (default 2.5). */
+  rippleGain?: number;
+  /** Variable glyph size floor (default 0.78). */
+  glyphMin?: number;
+  /** Variable glyph size gain per luminance tier (default 0.4). */
+  glyphGain?: number;
 }
 
 interface Env {
@@ -96,15 +104,17 @@ function detectEnv(): Env {
   return { ok, fine, reduced, dpr, urlVariant };
 }
 
-/** Advances time, the spike-rate clock, activation easing, and choreography. */
+/** Advances time, the spike-rate clock, ripple, activation, choreography. */
 function Driver({ fs }: { fs: FieldState }) {
   const sample = useMemo(() => createStopSample(), []);
   const prevFocus = useRef<FocusId>(null);
+  const prevP = useRef<number | null>(null);
   useFrame((state, delta) => {
     const dt = fs.reduced ? 0 : Math.min(Math.max(delta, 0), 0.05);
     fs.dt = dt;
     fs.narrow = state.size.width < 768;
-    evaluateStops(getScrollProgress(), fs.narrow, sample);
+    const p = getScrollProgress();
+    evaluateStops(p, fs.narrow, sample);
     fs.objPos.copy(sample.pos);
     fs.objScale = sample.scale;
     fs.orbitGain = sample.orbitGain;
@@ -113,6 +123,24 @@ function Driver({ fs }: { fs: FieldState }) {
     fs.sync = sample.sync;
     fs.accent.copy(sample.accent);
 
+    // — scroll ripple: smoothed velocity → sweeping band + burst boost —
+    if (!fs.reduced && dt > 0) {
+      const dp = prevP.current === null ? 0 : p - prevP.current;
+      const raw = dp / dt;
+      fs.scrollVel += (raw - fs.scrollVel) * (1 - Math.exp(-8 * dt));
+      const target = Math.min(Math.abs(fs.scrollVel) * fs.rippleGain, 1);
+      fs.rippleAmp = Math.max(target, fs.rippleAmp * Math.exp(-dt / 0.22)); // ~600 ms decay
+      fs.wavePhase += dp * 14; // band follows scroll direction along the long axis
+      if (fs.wavePhase > 1.9 || fs.wavePhase < -1.9) {
+        fs.wavePhase = ((((fs.wavePhase + 1.9) % 3.8) + 3.8) % 3.8) - 1.9;
+      }
+    } else {
+      fs.scrollVel = 0;
+      fs.rippleAmp = 0;
+    }
+    prevP.current = p;
+    const rippleBoost = 1 + 5 * Math.min(Math.abs(fs.scrollVel) * fs.rippleGain, 1);
+
     if (fs.reduced) {
       fs.time = 11.0; // frozen, composed pose
       fs.pulse = 0;
@@ -120,10 +148,12 @@ function Driver({ fs }: { fs: FieldState }) {
     } else {
       fs.time += dt;
       // envelope generator kept as the spike-rate clock: intervals shrink
-      // as the choreography's spikeRate rises (storm at open-source)
+      // as the choreography's spikeRate rises (storm at open-source) and
+      // while scrolling (ripple boost)
       if (fs.time >= fs.nextPulseAt) {
         fs.pulseStart = fs.time;
-        fs.nextPulseAt = fs.time + (2.4 + Math.random() * 1.6) / (0.3 + 2.2 * fs.spikeRate);
+        fs.nextPulseAt =
+          fs.time + (2.4 + Math.random() * 1.6) / ((0.3 + 2.2 * fs.spikeRate) * rippleBoost);
         fs.spikeBurstSeq++;
       }
       const e = fs.time - fs.pulseStart;
@@ -193,12 +223,18 @@ function LoopGovernor({
   exposure,
   underlayer,
   clusterOverride,
+  rippleGain,
+  glyphMin,
+  glyphGain,
 }: {
   reduced: boolean;
   cellPx?: number;
   exposure?: number;
   underlayer?: number;
   clusterOverride?: number;
+  rippleGain?: number;
+  glyphMin?: number;
+  glyphGain?: number;
 }) {
   const setFrameloop = useThree((s) => s.setFrameloop);
   const invalidate = useThree((s) => s.invalidate);
@@ -219,7 +255,7 @@ function LoopGovernor({
   useEffect(() => onFocus(() => invalidate()), [invalidate]);
   useEffect(() => {
     invalidate();
-  }, [cellPx, exposure, underlayer, clusterOverride, invalidate]);
+  }, [cellPx, exposure, underlayer, clusterOverride, rippleGain, glyphMin, glyphGain, invalidate]);
   return null;
 }
 
@@ -230,6 +266,9 @@ export default function SignalField({
   underlayer,
   variant = "silicon",
   clusterOverride,
+  rippleGain,
+  glyphMin,
+  glyphGain,
 }: SignalFieldProps) {
   const [env] = useState(detectEnv);
   const [reduced, setReduced] = useState(env.reduced);
@@ -239,7 +278,7 @@ export default function SignalField({
     const s = createFieldState();
     s.fine = env.fine;
     s.reduced = env.reduced;
-    s.cellPx = env.fine ? 12 : 14;
+    s.cellPx = env.fine ? 14 : 16;
     s.variant = effVariant;
     return s;
   }, [env, effVariant]);
@@ -276,10 +315,13 @@ export default function SignalField({
 
   // props → field state
   useEffect(() => {
-    fs.cellPx = cellPx ?? (env.fine ? 12 : 14);
+    fs.cellPx = cellPx ?? (env.fine ? 14 : 16);
     fs.exposureBase = exposure ?? 1;
-    fs.underlayer = underlayer ?? 0.35;
-  }, [fs, env.fine, cellPx, exposure, underlayer]);
+    fs.underlayer = underlayer ?? 0.5;
+    fs.rippleGain = rippleGain ?? 2.5;
+    fs.glyphMin = glyphMin ?? 0.78;
+    fs.glyphGain = glyphGain ?? 0.4;
+  }, [fs, env.fine, cellPx, exposure, underlayer, rippleGain, glyphMin, glyphGain]);
 
   // reduced-motion preference may change at runtime
   useEffect(() => {
@@ -386,6 +428,9 @@ export default function SignalField({
           exposure={exposure}
           underlayer={underlayer}
           clusterOverride={clusterOverride}
+          rippleGain={rippleGain}
+          glyphMin={glyphMin}
+          glyphGain={glyphGain}
         />
       </Canvas>
     </div>

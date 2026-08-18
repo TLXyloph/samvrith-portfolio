@@ -27,7 +27,7 @@ function fontStack(): string {
   } catch {
     // ignore — fall through to the literal stack
   }
-  return `500 48px ${resolved}"Geist Mono", "SFMono-Regular", Menlo, monospace`;
+  return `500 54px ${resolved}"Geist Mono", "SFMono-Regular", Menlo, monospace`;
 }
 
 function drawAtlas(canvas: HTMLCanvasElement): void {

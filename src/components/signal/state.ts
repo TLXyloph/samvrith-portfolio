@@ -34,6 +34,15 @@ export interface FieldState {
   accent: THREE.Color;
   spikeRate: number;
   sync: number;
+  /** v3 scroll ripple: smoothed d(progress)/dt drives a brightness band
+   * sweeping the long axis; amplitude decays ~600 ms after scrolling. */
+  scrollVel: number;
+  wavePhase: number;
+  rippleAmp: number;
+  rippleGain: number;
+  /** v3 variable glyph size (macro grid): scale = min + gain·(index/9). */
+  glyphMin: number;
+  glyphGain: number;
   /** Per-cluster eased activation, indices 0..8 (organic 0–4, silicon 5–8).
    * Shader uniforms reference this array directly. */
   clusterAct: Float32Array;
@@ -71,17 +80,23 @@ export function createFieldState(): FieldState {
     nextPulseAt: 1.1,
     exposure: 1,
     exposureBase: 1,
-    underlayer: 0.35,
-    cellPx: 12,
+    underlayer: 0.5,
+    cellPx: 14,
     contrast: 1.12,
     globalDim: 1,
     orbitGain: 1,
     objPos: new THREE.Vector3(1.15, 0.12, 0),
-    objScale: 1,
+    objScale: 1.15,
     variant: "silicon",
     accent: new THREE.Color("#8b9cf5"),
     spikeRate: 0.35,
     sync: 0,
+    scrollVel: 0,
+    wavePhase: -1.6,
+    rippleAmp: 0,
+    rippleGain: 2.5,
+    glyphMin: 0.78,
+    glyphGain: 0.4,
     clusterAct: new Float32Array(9),
     focus: null,
     clusterOverride: null,
@@ -113,13 +128,14 @@ interface Stop {
   accent: THREE.Color;
 }
 
+// v3: bigger, present, less shrink — the brain stays a protagonist.
 const STOPS: readonly Stop[] = [
-  { p: 0.0, pos: [1.15, 0.12, 0.0], scale: 1.0, exposure: 0.95, orbitGain: 1.0, active: -1, rate: 0.35, sync: 0, accent: new THREE.Color("#8b9cf5") },
-  { p: 0.14, pos: [1.7, 0.2, -1.0], scale: 0.85, exposure: 0.75, orbitGain: 1.0, active: 0, rate: 0.5, sync: 0, accent: new THREE.Color("#9994f8") },
-  { p: 0.3, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.5, orbitGain: 1.0, active: 1, rate: 0.6, sync: 0, accent: new THREE.Color("#a78bfa") },
-  { p: 0.55, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.52, orbitGain: 1.0, active: 2, rate: 1.0, sync: 0, accent: new THREE.Color("#ce7fd8") },
-  { p: 0.75, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.42, orbitGain: 1.0, active: 3, rate: 0.5, sync: 0, accent: new THREE.Color("#f472b6") },
-  { p: 0.92, pos: [0.0, 0.1, 0.0], scale: 0.9, exposure: 0.9, orbitGain: 0.6, active: -1, rate: 0.7, sync: 1, accent: new THREE.Color("#fb7185") },
+  { p: 0.0, pos: [1.15, 0.12, 0.0], scale: 1.15, exposure: 0.95, orbitGain: 1.0, active: -1, rate: 0.35, sync: 0, accent: new THREE.Color("#8b9cf5") },
+  { p: 0.14, pos: [1.7, 0.2, -0.6], scale: 0.95, exposure: 0.85, orbitGain: 1.0, active: 0, rate: 0.5, sync: 0, accent: new THREE.Color("#9994f8") },
+  { p: 0.3, pos: [2.0, 0.3, -1.2], scale: 0.9, exposure: 0.7, orbitGain: 1.0, active: 1, rate: 0.6, sync: 0, accent: new THREE.Color("#a78bfa") },
+  { p: 0.55, pos: [2.0, 0.3, -1.2], scale: 0.9, exposure: 0.68, orbitGain: 1.0, active: 2, rate: 1.0, sync: 0, accent: new THREE.Color("#ce7fd8") },
+  { p: 0.75, pos: [2.0, 0.3, -1.2], scale: 0.9, exposure: 0.62, orbitGain: 1.0, active: 3, rate: 0.5, sync: 0, accent: new THREE.Color("#f472b6") },
+  { p: 0.92, pos: [0.0, 0.1, 0.0], scale: 1.05, exposure: 0.95, orbitGain: 0.6, active: -1, rate: 0.7, sync: 1, accent: new THREE.Color("#fb7185") },
 ];
 
 function smooth(u: number): number {
