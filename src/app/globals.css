@@ -75,61 +75,42 @@ body {
 .scrim {
   background: linear-gradient(
     to right,
-    var(--scrim) 0%,
-    var(--scrim) 62%,
-    transparent 100%
+    rgba(5, 5, 8, 0.58) 0%,
+    rgba(5, 5, 8, 0.58) 52%,
+    transparent 92%
   );
 }
 
-/* ————— liquid metal: purple chrome, reserved for tiny accents only
-   (the primary CTA, the `merged` badge, the scroll-progress bar) ————— */
-.liquid-metal {
-  /* darkest stops stay ≥4.5:1 against text-void, so the CTA label passes AA
-     at every phase of the sheen (and when reduced-motion parks it at 0%) */
-  background-image: linear-gradient(
-    115deg,
-    #8478cf 0%,
-    #a99cf0 16%,
-    #ece7ff 30%,
-    #b3a1fb 44%,
-    #7d71c6 58%,
-    #b0a3f4 76%,
-    #8478cf 100%
-  );
-  background-size: 220% 100%;
-  animation: lm-sheen 7s linear infinite;
+/* ————— quiet animated CTA: a hairline that slowly breathes toward iris ————— */
+.breathe {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.03);
+  animation: breathe 4.5s ease-in-out infinite;
 }
 
-.liquid-metal-text {
-  /* darkest stops stay ≥4.5:1 against the void background for small text */
-  background-image: linear-gradient(
-    115deg,
-    #9488dd 0%,
-    #c3b6f8 22%,
-    #f0ecff 38%,
-    #b3a1fb 54%,
-    #8f83d4 72%,
-    #9488dd 100%
-  );
-  background-size: 260% 100%;
-  animation: lm-sheen 6s linear infinite;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-@keyframes lm-sheen {
-  to {
-    background-position: -220% 0;
+@keyframes breathe {
+  0%,
+  100% {
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.03);
   }
+  50% {
+    border-color: rgba(167, 139, 250, 0.45);
+    background-color: rgba(167, 139, 250, 0.07);
+  }
+}
+
+/* scroll-progress fill: a quiet static signal gradient */
+.signal-bar {
+  background: linear-gradient(90deg, #8b9cf5, #a78bfa 55%, #f472b6);
+  opacity: 0.75;
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  .liquid-metal,
-  .liquid-metal-text {
+  .breathe {
     animation: none;
   }
 }
