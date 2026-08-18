@@ -46,9 +46,15 @@ export default function Hero() {
             <div className="mt-10 flex flex-wrap items-center gap-4">
               <a
                 href="#projects"
-                className="liquid-metal rounded-full px-6 py-3 font-mono text-[13px] font-medium text-void transition hover:-translate-y-px hover:brightness-110"
+                className="group breathe rounded-full px-6 py-3 font-mono text-[13px] text-ink transition duration-300 hover:-translate-y-px hover:border-white/25"
               >
-                view projects <span aria-hidden="true">↓</span>
+                view projects{" "}
+                <span
+                  aria-hidden="true"
+                  className="inline-block transition duration-300 group-hover:translate-y-0.5"
+                >
+                  ↓
+                </span>
               </a>
               <ArrowLink href={identity.github} label="github" />
             </div>

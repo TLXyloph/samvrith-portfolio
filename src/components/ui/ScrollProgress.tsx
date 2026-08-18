@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Hairline read-out of document scroll position — a liquid-metal fill scaled
+ * Hairline read-out of document scroll position — a signal-gradient fill scaled
  * along X. Decorative, so it stays out of the a11y tree and out of the hit
  * region. Fixed-position, so it costs no layout.
  *
@@ -52,7 +52,7 @@ export default function ScrollProgress() {
     >
       <div
         ref={fillRef}
-        className="liquid-metal h-full w-full origin-left"
+        className="signal-bar h-full w-full origin-left"
         style={{ transform: "scaleX(0)" }}
       />
     </div>

@@ -80,11 +80,13 @@ function CompactCard({ project }: { project: Project }) {
     <article className={`glass-panel flex h-full flex-col rounded-xl p-6 ${CARD_HOVER}`}>
       <h3 className="text-[15px] font-medium text-ink">{project.name}</h3>
       <p className="mt-1 font-serif text-sm italic text-dim">{project.tagline}</p>
-      <p className="mt-3 line-clamp-3 text-[13.5px] leading-relaxed text-faint">
+      <p className="mt-3 text-[13.5px] leading-relaxed text-faint">
         {project.description}
       </p>
 
-      <div className="flex-1" />
+      {/* Spacer absorbs the slack so every card's chip/link block sits on the
+          same baseline within a grid row, whatever the description's length. */}
+      <div className="mt-auto" />
 
       <div className="mt-5 flex flex-wrap gap-2">
         {project.stack.slice(0, 3).map((tech) => (

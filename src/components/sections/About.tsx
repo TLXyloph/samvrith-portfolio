@@ -5,7 +5,7 @@ import Chip from "@/components/ui/Chip";
 
 const TILES: Metric[] = [
   ...heroStats.slice(0, 3),
-  { value: "6", label: "merged upstream PRs" },
+  { value: "27 ms", label: "per NeuroMCP tool call" },
 ];
 
 export default function About() {
