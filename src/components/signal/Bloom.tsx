@@ -124,10 +124,12 @@ function buildStars(): StarAssets {
   const rig = new THREE.Group();
   const geo = createStarGeometry();
   const mat = new THREE.PointsMaterial({
-    // bright pixels, but tiny: the 4-tap cell average dilutes them so they
-    // only ever land on the dimmest glyphs (`.`/`:`)
-    color: new THREE.Color("#e2e6ff"),
-    size: 3,
+    // full-cell coverage at low luminance: the 4-tap average then lands on
+    // the dimmest glyphs (`.`/`:`) crisply, while the blurred underlayer
+    // contribution of so dim a point stays invisible (tiny-but-bright
+    // points do the opposite — blank glyphs plus gray underlayer blobs)
+    color: new THREE.Color("#4c5478"),
+    size: 7,
     sizeAttenuation: false,
     depthWrite: false,
   });

@@ -13,7 +13,7 @@ export default function Contact() {
       className="flex min-h-[70vh] items-center"
       innerClassName="flex flex-col justify-center"
       title="Building something at the hardware–intelligence seam?"
-      titleClassName="font-serif text-[clamp(2rem,5vw,3.6rem)] italic leading-tight text-ink"
+      titleClassName="max-w-4xl font-serif text-[clamp(2rem,5vw,3.6rem)] italic leading-tight text-ink [text-wrap:balance]"
     >
       <Reveal delay={0.06}>
         <div className="glass-panel mt-10 max-w-xl rounded-xl p-6 font-mono text-[14px]">

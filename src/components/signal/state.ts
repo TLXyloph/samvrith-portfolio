@@ -78,11 +78,11 @@ interface Stop {
 }
 
 const STOPS: readonly Stop[] = [
-  { p: 0.0, pos: [0.9, 0.0, 0.0], scale: 1.0, exposure: 1.0, disperse: 0.0, orbitGain: 1.0 },
-  { p: 0.14, pos: [1.6, 0.2, -1.0], scale: 0.85, exposure: 0.75, disperse: 0.0, orbitGain: 1.0 },
-  { p: 0.3, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.38, disperse: 0.0, orbitGain: 1.0 },
-  { p: 0.55, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.34, disperse: 0.5, orbitGain: 1.0 },
-  { p: 0.75, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.32, disperse: 0.85, orbitGain: 1.0 },
+  { p: 0.0, pos: [1.15, 0.12, 0.0], scale: 1.0, exposure: 0.95, disperse: 0.0, orbitGain: 1.0 },
+  { p: 0.14, pos: [1.7, 0.2, -1.0], scale: 0.85, exposure: 0.75, disperse: 0.0, orbitGain: 1.0 },
+  { p: 0.3, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.5, disperse: 0.0, orbitGain: 1.0 },
+  { p: 0.55, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.46, disperse: 0.5, orbitGain: 1.0 },
+  { p: 0.75, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.42, disperse: 0.85, orbitGain: 1.0 },
   { p: 0.92, pos: [0.0, 0.1, 0.0], scale: 0.9, exposure: 0.9, disperse: 0.0, orbitGain: 0.6 },
 ];
 
