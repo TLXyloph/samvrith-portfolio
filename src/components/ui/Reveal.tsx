@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 const RISE = 14;
@@ -27,6 +27,22 @@ export default function Reveal({
   className,
 }: RevealProps) {
   const reduced = useReducedMotion();
+
+  // Hidden tabs never tick rAF, so motion can't play the entrance there
+  // (background-tab preloads would sit at opacity 0 until a scroll).
+  // SSR and first client render stay identical; the swap happens after
+  // hydration, which is the one legal place for this divergence.
+  const [inert, setInert] = useState(false);
+  useEffect(() => {
+    if (document.visibilityState === "hidden") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional two-pass client divergence
+      setInert(true);
+    }
+  }, []);
+
+  if (inert) {
+    return <div className={className}>{children}</div>;
+  }
 
   const hidden = { opacity: 0, y: reduced ? 0 : RISE };
   const shown = { opacity: 1, y: 0 };
