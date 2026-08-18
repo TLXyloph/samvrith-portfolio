@@ -20,6 +20,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://samvrith-portfolio.vercel.app"),
   title: "Samvrith Bandi — from microvolts to meaning",
   description:
     "Electrical engineer building the whole signal chain: custom analog front-ends, on-device neural networks, and agent interfaces. Purdue ECE, Fall 2026.",
