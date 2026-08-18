@@ -23,6 +23,19 @@ export const metadata: Metadata = {
   title: "Samvrith Bandi — from microvolts to meaning",
   description:
     "Electrical engineer building the whole signal chain: custom analog front-ends, on-device neural networks, and agent interfaces. Purdue ECE, Fall 2026.",
+  openGraph: {
+    title: "Samvrith Bandi — from microvolts to meaning",
+    description:
+      "Custom analog front-ends, on-device neural networks, and agent interfaces — the whole signal chain.",
+    type: "website",
+    siteName: "Samvrith Bandi",
+  },
+  twitter: {
+    card: "summary",
+    title: "Samvrith Bandi — from microvolts to meaning",
+    description:
+      "Custom analog front-ends, on-device neural networks, and agent interfaces — the whole signal chain.",
+  },
 };
 
 export const viewport: Viewport = {
