@@ -117,7 +117,7 @@ const STOPS: readonly Stop[] = [
   { p: 0.0, pos: [1.15, 0.12, 0.0], scale: 1.0, exposure: 0.95, orbitGain: 1.0, active: -1, rate: 0.35, sync: 0, accent: new THREE.Color("#8b9cf5") },
   { p: 0.14, pos: [1.7, 0.2, -1.0], scale: 0.85, exposure: 0.75, orbitGain: 1.0, active: 0, rate: 0.5, sync: 0, accent: new THREE.Color("#9994f8") },
   { p: 0.3, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.5, orbitGain: 1.0, active: 1, rate: 0.6, sync: 0, accent: new THREE.Color("#a78bfa") },
-  { p: 0.55, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.46, orbitGain: 1.0, active: 2, rate: 1.0, sync: 0, accent: new THREE.Color("#ce7fd8") },
+  { p: 0.55, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.52, orbitGain: 1.0, active: 2, rate: 1.0, sync: 0, accent: new THREE.Color("#ce7fd8") },
   { p: 0.75, pos: [2.2, 0.4, -2.5], scale: 0.6, exposure: 0.42, orbitGain: 1.0, active: 3, rate: 0.5, sync: 0, accent: new THREE.Color("#f472b6") },
   { p: 0.92, pos: [0.0, 0.1, 0.0], scale: 0.9, exposure: 0.9, orbitGain: 0.6, active: -1, rate: 0.7, sync: 1, accent: new THREE.Color("#fb7185") },
 ];

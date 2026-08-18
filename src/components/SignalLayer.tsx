@@ -50,7 +50,7 @@ export default function SignalLayer() {
 
   return (
     <SignalBoundary>
-      <SignalField externalScroll />
+      <SignalField externalScroll underlayer={0.3} />
       <CursorDot />
     </SignalBoundary>
   );
