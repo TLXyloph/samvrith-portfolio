@@ -6,9 +6,11 @@
 
 /**
  * SignalField — fixed, full-viewport, pointer-events-none WebGL background
- * (z-0, aria-hidden). Renders an iridescent signal bloom through a custom
- * ASCII postprocess; orbits around the mouse, sheds glyph particles from
- * the pointer, and evolves with scroll (see scrollBus.ts).
+ * (z-0, aria-hidden). Renders the "Silicon Cortex" — a procedural brain
+ * point cloud (variant "silicon": half organic, half Manhattan-trace
+ * silicon; variant "connectome": full organic) through a dual-resolution
+ * ASCII postprocess; orbits around the mouse, sheds discreet pointer
+ * motes, and walks activation/accent with scroll (see scrollBus.ts).
  *
  * IMPORTANT: consumers must import this via next/dynamic with ssr disabled:
  *   const SignalField = dynamic(() => import("@/components/signal/SignalField"), { ssr: false });
@@ -16,19 +18,30 @@
  * Props (all optional): externalScroll (skip the internal window-scroll
  * fallback; drive progress via scrollBus/Lenis instead), cellPx (glyph cell
  * size in CSS px — default 12 fine-pointer / 14 coarse), exposure (base
- * multiplier, default 1), underlayer (soft color bed strength, default 0.35).
+ * multiplier, default 1), underlayer (soft color bed strength, default
+ * 0.35), variant ("silicon" default | "connectome"; `?variant=a` in the URL
+ * overrides to "connectome"), clusterOverride (lab: pin activation −1..8).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { Bloom, Starfield } from "./Bloom";
-import { Particles } from "./Particles";
+import { Cortex } from "./Cortex";
+import { Motes } from "./Motes";
 import { AsciiPipeline } from "./AsciiPipeline";
-import { getScrollProgress, onScrollProgress, setScrollProgress } from "./scrollBus";
+import {
+  getFocus,
+  getScrollProgress,
+  onFocus,
+  onScrollProgress,
+  setScrollProgress,
+  type FocusId,
+} from "./scrollBus";
+import { buildBrainData, type SignalVariant } from "./brain";
 import {
   createFieldState,
   createStopSample,
   evaluateStops,
+  focusCluster,
   type FieldState,
 } from "./state";
 
@@ -41,6 +54,10 @@ export interface SignalFieldProps {
   exposure?: number;
   /** Underlayer strength 0..~0.8 (default 0.35). */
   underlayer?: number;
+  /** Hero variant. `?variant=a` in the URL overrides to "connectome". */
+  variant?: SignalVariant;
+  /** Lab: pin the active cluster (−1 resting .. 8); undefined = scroll-driven. */
+  clusterOverride?: number;
 }
 
 interface Env {
@@ -48,11 +65,12 @@ interface Env {
   fine: boolean;
   reduced: boolean;
   dpr: number;
+  urlVariant: SignalVariant | null;
 }
 
 function detectEnv(): Env {
   if (typeof window === "undefined" || typeof document === "undefined") {
-    return { ok: false, fine: true, reduced: false, dpr: 1 };
+    return { ok: false, fine: true, reduced: false, dpr: 1, urlVariant: null };
   }
   let ok = false;
   try {
@@ -64,28 +82,49 @@ function detectEnv(): Env {
   } catch {
     ok = false;
   }
+  let urlVariant: SignalVariant | null = null;
+  try {
+    if (new URLSearchParams(window.location.search).get("variant") === "a") {
+      urlVariant = "connectome";
+    }
+  } catch {
+    urlVariant = null;
+  }
   const fine = window.matchMedia("(pointer: fine)").matches;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const dpr = Math.min(window.devicePixelRatio || 1, fine ? 2 : 1.5);
-  return { ok, fine, reduced, dpr };
+  return { ok, fine, reduced, dpr, urlVariant };
 }
 
-/** Advances time, the EMG pulse envelope, and the scroll choreography. */
+/** Advances time, the spike-rate clock, activation easing, and choreography. */
 function Driver({ fs }: { fs: FieldState }) {
   const sample = useMemo(() => createStopSample(), []);
+  const prevFocus = useRef<FocusId>(null);
   useFrame((state, delta) => {
     const dt = fs.reduced ? 0 : Math.min(Math.max(delta, 0), 0.05);
     fs.dt = dt;
     fs.narrow = state.size.width < 768;
+    evaluateStops(getScrollProgress(), fs.narrow, sample);
+    fs.objPos.copy(sample.pos);
+    fs.objScale = sample.scale;
+    fs.orbitGain = sample.orbitGain;
+    fs.exposure = sample.exposure * fs.exposureBase;
+    fs.spikeRate = sample.rate;
+    fs.sync = sample.sync;
+    fs.accent.copy(sample.accent);
+
     if (fs.reduced) {
       fs.time = 11.0; // frozen, composed pose
       fs.pulse = 0;
       fs.pointerSpeed = 0;
     } else {
       fs.time += dt;
+      // envelope generator kept as the spike-rate clock: intervals shrink
+      // as the choreography's spikeRate rises (storm at open-source)
       if (fs.time >= fs.nextPulseAt) {
         fs.pulseStart = fs.time;
-        fs.nextPulseAt = fs.time + 2.4 + Math.random() * 1.6; // every 2.4–4.0s
+        fs.nextPulseAt = fs.time + (2.4 + Math.random() * 1.6) / (0.3 + 2.2 * fs.spikeRate);
+        fs.spikeBurstSeq++;
       }
       const e = fs.time - fs.pulseStart;
       const env = e < 0 ? 0 : e < 0.12 ? e / 0.12 : Math.exp(-(e - 0.12) * 3.3);
@@ -93,12 +132,24 @@ function Driver({ fs }: { fs: FieldState }) {
       fs.pulse = Math.max(env, baseline);
       fs.pointerSpeed *= Math.exp(-3 * dt);
     }
-    evaluateStops(getScrollProgress(), fs.narrow, sample);
-    fs.objPos.copy(sample.pos);
-    fs.objScale = sample.scale;
-    fs.disperse = sample.disperse;
-    fs.orbitGain = sample.orbitGain;
-    fs.exposure = sample.exposure * fs.exposureBase;
+
+    // entering sparse-emg focus on silicon → burst packets through block 5
+    if (fs.focus !== prevFocus.current) {
+      if (fs.focus === "sparse-emg" && fs.variant === "silicon") fs.focusPacketSeq++;
+      prevFocus.current = fs.focus;
+    }
+
+    // activation target: focus > lab override > scroll stop
+    let target = sample.active;
+    if (fs.clusterOverride !== null) target = fs.clusterOverride;
+    if (fs.focus) target = focusCluster(fs.focus, fs.variant);
+
+    // ease per-cluster activation toward the target (~300 ms settle)
+    const k = fs.reduced ? 1 : 1 - Math.exp(-10 * dt);
+    for (let i = 0; i < 9; i++) {
+      const goal = i === target ? 1 : 0;
+      fs.clusterAct[i] += (goal - fs.clusterAct[i]) * k;
+    }
   });
   return null;
 }
@@ -141,11 +192,13 @@ function LoopGovernor({
   cellPx,
   exposure,
   underlayer,
+  clusterOverride,
 }: {
   reduced: boolean;
   cellPx?: number;
   exposure?: number;
   underlayer?: number;
+  clusterOverride?: number;
 }) {
   const setFrameloop = useThree((s) => s.setFrameloop);
   const invalidate = useThree((s) => s.invalidate);
@@ -163,9 +216,10 @@ function LoopGovernor({
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [reduced, setFrameloop, invalidate]);
   useEffect(() => onScrollProgress(() => invalidate()), [invalidate]);
+  useEffect(() => onFocus(() => invalidate()), [invalidate]);
   useEffect(() => {
     invalidate();
-  }, [cellPx, exposure, underlayer, invalidate]);
+  }, [cellPx, exposure, underlayer, clusterOverride, invalidate]);
   return null;
 }
 
@@ -174,17 +228,38 @@ export default function SignalField({
   cellPx,
   exposure,
   underlayer,
+  variant = "silicon",
+  clusterOverride,
 }: SignalFieldProps) {
   const [env] = useState(detectEnv);
   const [reduced, setReduced] = useState(env.reduced);
   const [ready, setReady] = useState(false); // first frame rendered → fade in
+  const effVariant: SignalVariant = env.urlVariant ?? variant;
   const fs = useMemo(() => {
     const s = createFieldState();
     s.fine = env.fine;
     s.reduced = env.reduced;
     s.cellPx = env.fine ? 12 : 14;
+    s.variant = effVariant;
     return s;
-  }, [env]);
+  }, [env, effVariant]);
+  const data = useMemo(
+    () => (env.ok ? buildBrainData(effVariant) : null),
+    [env.ok, effVariant],
+  );
+
+  // focus channel (frozen scrollBus API) → field state
+  useEffect(() => {
+    fs.focus = getFocus();
+    return onFocus((id) => {
+      fs.focus = id;
+    });
+  }, [fs]);
+
+  // lab activation override → field state
+  useEffect(() => {
+    fs.clusterOverride = clusterOverride ?? null;
+  }, [fs, clusterOverride]);
 
   // first-frame handshake: reveal the canvas once the pipeline has drawn
   useEffect(() => {
@@ -273,7 +348,7 @@ export default function SignalField({
     return () => window.removeEventListener("scroll", onScroll);
   }, [env.ok, externalScroll]);
 
-  if (!env.ok) return null; // no WebGL2 → page stays plain #050508
+  if (!env.ok || !data) return null; // no WebGL2 → page stays plain #050508
 
   return (
     <div
@@ -286,6 +361,7 @@ export default function SignalField({
       }}
     >
       <Canvas
+        key={effVariant}
         frameloop={reduced ? "demand" : "always"}
         dpr={env.dpr}
         camera={{ fov: 42, near: 0.1, far: 80, position: [0, 0, 7] }}
@@ -301,15 +377,15 @@ export default function SignalField({
       >
         <Driver fs={fs} />
         <CameraRig fs={fs} />
-        <Bloom fs={fs} />
-        <Starfield fs={fs} />
-        {!reduced && <Particles fs={fs} />}
+        <Cortex fs={fs} data={data} />
+        {!reduced && <Motes fs={fs} />}
         <AsciiPipeline fs={fs} />
         <LoopGovernor
           reduced={reduced}
           cellPx={cellPx}
           exposure={exposure}
           underlayer={underlayer}
+          clusterOverride={clusterOverride}
         />
       </Canvas>
     </div>

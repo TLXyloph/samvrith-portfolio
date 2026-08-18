@@ -7,11 +7,14 @@
 /**
  * Hand-rolled ASCII postprocess (no postprocessing lib):
  *   Pass A  — scene → RT0 at 0.6× drawing-buffer size (HalfFloat, Linear).
+ *   Pass ID — silicon-only orientation IDs → RT_ID at 0.3× (RGBA8, NEAREST;
+ *             isolated scene + NoBlending materials, so additive display
+ *             materials can never pollute the IDs — see Cortex).
  *   Pass A2 — RT0 → RT1 at 0.1× (soft color underlayer; bilinear upsample
  *             acts as a free blur).
- *   Pass B  — fullscreen triangle to screen: 4-tap cell average → ACES →
- *             luminance quantized into a 10-step monospace glyph ramp,
- *             chroma preserved, composited over void + underlayer.
+ *   Pass B  — fullscreen triangle to screen: dual-resolution quantization —
+ *             organic macro cells by luminance ramp; silicon micro cells
+ *             (cellPx/2, exactly nested) by trace orientation ('-' '|' '+' 'o').
  * Runs as a useFrame(…, 1) takeover, so r3f's own render is disabled.
  */
 import { useEffect, useMemo, useRef } from "react";
@@ -24,6 +27,7 @@ import { VOID_HEX, type FieldState } from "./state";
 interface Targets {
   rt0: THREE.WebGLRenderTarget;
   rt1: THREE.WebGLRenderTarget;
+  rtId: THREE.WebGLRenderTarget;
   w: number;
   h: number;
 }
@@ -48,6 +52,8 @@ function buildPack() {
     uniforms: {
       tScene: { value: null },
       tUnder: { value: null },
+      tID: { value: null },
+      uHasID: { value: 0 },
       tGlyphs: { value: getGlyphAtlas() },
       uResolution: { value: new THREE.Vector2(1, 1) },
       uCellSize: { value: 24 },
@@ -106,6 +112,7 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
       if (t) {
         t.rt0.dispose();
         t.rt1.dispose();
+        t.rtId.dispose();
         targets.current = null; // re-init RTs on next frame
       }
       invalidate();
@@ -126,6 +133,7 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
       if (t) {
         t.rt0.dispose();
         t.rt1.dispose();
+        t.rtId.dispose();
         targets.current = null;
       }
     },
@@ -145,6 +153,7 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
         try {
           if (typeof gl.compileAsync === "function") {
             gl.compileAsync(scene, camera)
+              .then(() => (fs.idScene ? gl.compileAsync(fs.idScene, camera) : null))
               .then(() => {
                 pack.mesh.material = pack.asciiMat;
                 return gl.compileAsync(pack.fsScene, pack.cam);
@@ -175,6 +184,7 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
       if (t) {
         t.rt0.dispose();
         t.rt1.dispose();
+        t.rtId.dispose();
       }
       const type =
         gl.extensions.has("EXT_color_buffer_float") ||
@@ -203,7 +213,22 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
           stencilBuffer: false,
         },
       );
-      t = { rt0, rt1, w, h };
+      // orientation IDs must never interpolate → NEAREST, plain RGBA8
+      const rtId = new THREE.WebGLRenderTarget(
+        Math.max(1, Math.floor(w * 0.3)),
+        Math.max(1, Math.floor(h * 0.3)),
+        {
+          minFilter: THREE.NearestFilter,
+          magFilter: THREE.NearestFilter,
+          depthBuffer: false,
+          stencilBuffer: false,
+        },
+      );
+      // start defined (all zero = "no silicon") even if the ID pass never runs
+      gl.setRenderTarget(rtId);
+      gl.clear(true, false, false);
+      gl.setRenderTarget(null);
+      t = { rt0, rt1, rtId, w, h };
       targets.current = t;
       pack.blitMat.uniforms.uTexel.value.set(1 / rt0.width, 1 / rt0.height);
     }
@@ -211,6 +236,8 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
     const u = pack.asciiMat.uniforms;
     u.tScene.value = t.rt0.texture;
     u.tUnder.value = t.rt1.texture;
+    u.tID.value = t.rtId.texture;
+    u.uHasID.value = fs.idScene ? 1 : 0;
     u.uResolution.value.set(w, h);
     u.uCellSize.value = Math.max(4, fs.cellPx * gl.getPixelRatio());
     u.uExposure.value = fs.exposure;
@@ -221,6 +248,11 @@ export function AsciiPipeline({ fs }: { fs: FieldState }) {
     // Pass A: scene → RT0
     gl.setRenderTarget(t.rt0);
     gl.render(scene, camera);
+    // Pass ID: silicon orientation codes → RT_ID (silicon variant only)
+    if (fs.idScene) {
+      gl.setRenderTarget(t.rtId);
+      gl.render(fs.idScene, camera);
+    }
     // Pass A2: RT0 → RT1
     pack.blitMat.uniforms.tSrc.value = t.rt0.texture;
     pack.mesh.material = pack.blitMat;

@@ -8,6 +8,8 @@
 import * as THREE from "three";
 
 export const GLYPH_RAMP = " .:-=+*x#%@";
+/** Silicon extras in the free cells: '|' at 11, 'o' at 12 (see ASCII_FRAG). */
+export const GLYPH_EXTRAS = "|o";
 export const ATLAS_CELLS = 16;
 const CELL = 64;
 
@@ -40,6 +42,9 @@ function drawAtlas(canvas: HTMLCanvasElement): void {
     const ch = GLYPH_RAMP[i];
     if (ch === " ") continue;
     ctx.fillText(ch, i * CELL + CELL / 2, CELL / 2 + 2);
+  }
+  for (let i = 0; i < GLYPH_EXTRAS.length; i++) {
+    ctx.fillText(GLYPH_EXTRAS[i], (GLYPH_RAMP.length + i) * CELL + CELL / 2, CELL / 2 + 2);
   }
 }
 

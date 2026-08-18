@@ -1,125 +1,101 @@
 /**
- * All GLSL for the SignalField: petal material, pointer glyph particles,
- * fullscreen blit, and the ASCII quantization pass.
- * Shaders are compiled by non-raw ShaderMaterial (three injects the
- * standard attribute/uniform prelude and USE_INSTANCING blocks).
+ * All GLSL for the SignalField v2 "silicon cortex":
+ * organic cortex points, silicon trace display + orientation-ID pass,
+ * billboard sparks (spikes/packets/motes), fullscreen blit, and the
+ * dual-resolution ASCII quantization pass.
+ * Compiled by non-raw ShaderMaterial (three injects the standard prelude
+ * and USE_INSTANCING blocks).
  */
 
-/** Compact GLSL simplex noise (Ashima Arts / Stefan Gustavson, MIT). */
-const SIMPLEX_3D = /* glsl */ `
-vec3 sf_mod289(vec3 x){ return x - floor(x * (1.0/289.0)) * 289.0; }
-vec4 sf_mod289(vec4 x){ return x - floor(x * (1.0/289.0)) * 289.0; }
-vec4 sf_permute(vec4 x){ return sf_mod289(((x*34.0)+1.0)*x); }
-vec4 sf_taylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314 * r; }
-float snoise(vec3 v){
-  const vec2 C = vec2(1.0/6.0, 1.0/3.0);
-  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-  vec3 i  = floor(v + dot(v, C.yyy));
-  vec3 x0 = v - i + dot(i, C.xxx);
-  vec3 g = step(x0.yzx, x0.xyz);
-  vec3 l = 1.0 - g;
-  vec3 i1 = min(g.xyz, l.zxy);
-  vec3 i2 = max(g.xyz, l.zxy);
-  vec3 x1 = x0 - i1 + C.xxx;
-  vec3 x2 = x0 - i2 + C.yyy;
-  vec3 x3 = x0 - D.yyy;
-  i = sf_mod289(i);
-  vec4 p = sf_permute(sf_permute(sf_permute(
-            i.z + vec4(0.0, i1.z, i2.z, 1.0))
-          + i.y + vec4(0.0, i1.y, i2.y, 1.0))
-          + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-  float n_ = 0.142857142857;
-  vec3 ns = n_ * D.wyz - D.xzx;
-  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-  vec4 x_ = floor(j * ns.z);
-  vec4 y_ = floor(j - 7.0 * x_);
-  vec4 x = x_ * ns.x + ns.yyyy;
-  vec4 y = y_ * ns.x + ns.yyyy;
-  vec4 h = 1.0 - abs(x) - abs(y);
-  vec4 b0 = vec4(x.xy, y.xy);
-  vec4 b1 = vec4(x.zw, y.zw);
-  vec4 s0 = floor(b0) * 2.0 + 1.0;
-  vec4 s1 = floor(b1) * 2.0 + 1.0;
-  vec4 sh = -step(h, vec4(0.0));
-  vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
-  vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
-  vec3 p0 = vec3(a0.xy, h.x);
-  vec3 p1 = vec3(a0.zw, h.y);
-  vec3 p2 = vec3(a1.xy, h.z);
-  vec3 p3 = vec3(a1.zw, h.w);
-  vec4 norm = sf_taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
-  p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-  m = m * m;
-  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
-}
-`;
-
-export const PETAL_VERT = /* glsl */ `
+/** Per-cluster activation is shared by points and traces (indices 0..8). */
+const CLUSTER_ACT = /* glsl */ `
+uniform float uClusterAct[9];
+uniform float uSync;
 uniform float uTime;
+float clusterAct(float id){
+  float act = uClusterAct[int(id + 0.5)];
+  // contact synchrony: all clusters breathe in slow phase-locked unison
+  float breathe = uSync * (0.55 + 0.45 * sin(uTime * 1.1));
+  return max(act * (1.0 - uSync), breathe);
+}
+`;
+
+export const POINT_VERT = /* glsl */ `
+uniform float uPointPx;   // desired point size in RT0 physical px at z≈7
 uniform float uPulse;
-uniform float uDisperse;
-uniform float uSeed;
-attribute vec3 aDir; // per-face pseudo-random shard direction
-attribute vec3 aCtr; // per-face centroid
-varying vec2 vUv;
-varying vec3 vN;
-varying vec3 vViewPos;
-${SIMPLEX_3D}
+uniform vec3 uAccent;
+uniform vec3 uColA;
+uniform vec3 uColB;
+attribute float aCluster;
+attribute float aRand;
+varying vec3 vColor;
+${CLUSTER_ACT}
 void main(){
-  vUv = uv;
-  float t = uv.y; // 0 at petal base, 1 at tip
-  // low-amplitude simplex ripple, stronger toward the tip
-  float ripple = snoise(position * 2.2 + vec3(uSeed * 13.1, uTime * 0.55, uTime * 0.35))
-               * 0.035 * (0.35 + 0.65 * t);
-  // traveling pulse burst, gated by the envelope
-  float burst = uPulse * (0.05 + 0.13 * sin(t * 9.0 - uTime * 7.0)) * (0.3 + 0.7 * t);
-  vec3 displaced = position + normal * (ripple + burst);
-  // dissolve: each face flies out as a small coherent shard along its
-  // pseudo-random direction, shrinking toward its centroid — at 1.0 the
-  // bloom is a cloud of glyph-sized flecks
-  vec3 scattered = aCtr + aDir * 3.5
-                 + (position - aCtr) * mix(1.0, 0.28, uDisperse)
-                 + normal * ripple * 2.5
-                 + aDir.yzx * (0.22 * uDisperse * sin(uTime * 0.7 + aCtr.y * 9.0 + uSeed));
-  vec3 p = mix(displaced, scattered, uDisperse);
-  vN = normalize(normalMatrix * normal);
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  vViewPos = mv.xyz;
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  float act = clusterAct(aCluster);
+  float shimmer = 0.9 + 0.18 * sin(uTime * (0.7 + aRand * 1.6) + aRand * 31.0);
+  vec3 base = mix(uColA, uColB, aRand);
+  vec3 col = mix(base, uAccent, 0.45 * act); // hue pulled toward the accent
+  float b = (0.16 + 0.34 * act) * shimmer * (1.0 + 0.22 * uPulse);
+  vColor = col * b;
   gl_Position = projectionMatrix * mv;
+  gl_PointSize = uPointPx * (7.0 / max(-mv.z, 0.5));
 }
 `;
 
-export const PETAL_FRAG = /* glsl */ `
-uniform float uPulse;
-uniform vec3 uColBase;
-uniform vec3 uColMid;
-uniform vec3 uColTip;
-uniform vec3 uColRim;
-varying vec2 vUv;
-varying vec3 vN;
-varying vec3 vViewPos;
+export const POINT_FRAG = /* glsl */ `
+varying vec3 vColor;
 void main(){
-  float t = vUv.y;
-  vec3 ramp = mix(uColBase, uColMid, smoothstep(0.0, 0.55, t));
-  ramp = mix(ramp, uColTip, smoothstep(0.5, 1.0, t));
-  vec3 N = normalize(vN);
-  if (!gl_FrontFacing) N = -N;
-  // fixed camera-space light, upper-left, lambert wrap 0.5
-  vec3 L = normalize(vec3(-0.55, 0.65, 0.52));
-  float ndl = clamp((dot(N, L) + 0.5) / 1.5, 0.0, 1.0);
-  vec3 col = ramp * (0.30 + 0.85 * ndl);
-  if (!gl_FrontFacing) col *= 0.4; // fake translucency
-  // fresnel rim as emissive — this draws the ASCII silhouette
-  vec3 V = normalize(-vViewPos);
-  float fres = pow(1.0 - abs(dot(N, V)), 2.2) * 1.5;
-  col += uColRim * fres;
-  col *= 1.0 + 0.30 * uPulse * (0.3 + 0.7 * t);
-  gl_FragColor = vec4(col, 1.0);
+  vec2 d = gl_PointCoord - 0.5;
+  float m = smoothstep(0.5, 0.16, length(d));
+  if (m <= 0.004) discard;
+  gl_FragColor = vec4(vColor * m, 1.0);
 }
 `;
 
-export const PARTICLE_VERT = /* glsl */ `
+export const TRACE_VERT = /* glsl */ `
+uniform vec3 uAccent;
+uniform vec3 uTraceCol;
+attribute float aOrient;
+attribute float aBlock;
+varying vec3 vColor;
+${CLUSTER_ACT}
+void main(){
+  float act = clusterAct(aBlock);
+  vec3 col = mix(uTraceCol, uAccent, 0.35 * act);
+  float b = 0.34 + 0.55 * act;
+  if (aOrient > 0.6) b *= 1.4; // junctions/vias pop slightly
+  vColor = col * b;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+export const TRACE_FRAG = /* glsl */ `
+varying vec3 vColor;
+void main(){
+  gl_FragColor = vec4(vColor, 1.0);
+}
+`;
+
+/** ID pass: writes the trace orientation code into R (isolated target). */
+export const TRACE_ID_VERT = /* glsl */ `
+attribute float aOrient;
+varying float vOrient;
+void main(){
+  vOrient = aOrient;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+export const TRACE_ID_FRAG = /* glsl */ `
+varying float vOrient;
+void main(){
+  gl_FragColor = vec4(vOrient, 0.0, 0.0, 1.0);
+}
+`;
+
+/** Instanced camera-facing quads: spikes, silicon packets, pointer motes. */
+export const SPARK_VERT = /* glsl */ `
 varying vec2 vUv;
 varying vec3 vColor;
 void main(){
@@ -141,7 +117,7 @@ void main(){
 }
 `;
 
-export const PARTICLE_FRAG = /* glsl */ `
+export const SPARK_FRAG = /* glsl */ `
 varying vec2 vUv;
 varying vec3 vColor;
 void main(){
@@ -176,11 +152,19 @@ void main(){
 }
 `;
 
-/** Pass B — ASCII quantization to screen. */
+/**
+ * Pass B — dual-resolution ASCII quantization to screen.
+ * Macro cells (uCellSize) quantize the organic scene by luminance.
+ * Where the orientation-ID target marks silicon, micro cells (uCellSize/2)
+ * pick glyphs by TRACE ORIENTATION: '-' horizontal, '|' vertical,
+ * '+' junctions, 'o' vias (atlas cells 3, 11, 5, 12). Grids nest exactly.
+ */
 export const ASCII_FRAG = /* glsl */ `
 uniform sampler2D tScene;
 uniform sampler2D tUnder;
 uniform sampler2D tGlyphs;
+uniform sampler2D tID;
+uniform float uHasID;
 uniform vec2 uResolution;
 uniform float uCellSize;   // physical px (cellPx CSS × dpr)
 uniform float uExposure;
@@ -197,19 +181,50 @@ vec3 toSrgb(vec3 c){
   vec3 hi = 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055;
   return mix(hi, lo, step(c, vec3(0.0031308)));
 }
-
-void main(){
-  vec2 cellSize = vec2(uCellSize);
-  vec2 cell = floor(gl_FragCoord.xy / cellSize);
-  vec2 centerPx = (cell + 0.5) * cellSize;
+vec3 cellColor(vec2 cellPx, vec2 centerPx){
   vec2 uv = centerPx / uResolution;
-  // 4-tap average around the cell center (±0.25 cell) — kills motion shimmer
-  vec2 o = (cellSize * 0.25) / uResolution;
+  vec2 o = (cellPx * 0.25) / uResolution; // 4-tap average — kills shimmer
   vec3 c = texture2D(tScene, uv + vec2(-o.x, -o.y)).rgb
          + texture2D(tScene, uv + vec2( o.x, -o.y)).rgb
          + texture2D(tScene, uv + vec2(-o.x,  o.y)).rgb
          + texture2D(tScene, uv + vec2( o.x,  o.y)).rgb;
-  c = aces(c * 0.25);
+  return aces(c * 0.25);
+}
+
+void main(){
+  vec2 cellSize = vec2(uCellSize);
+  vec3 under = aces(texture2D(tUnder, gl_FragCoord.xy / uResolution).rgb)
+             * uUnderlayer * min(uExposure, 1.0);
+
+  // silicon micro path (orientation-driven glyphs at half-size cells)
+  if (uHasID > 0.5) {
+    vec2 microSize = cellSize * 0.5;
+    vec2 microCell = floor(gl_FragCoord.xy / microSize);
+    vec2 microCenter = (microCell + 0.5) * microSize;
+    float orient = texture2D(tID, microCenter / uResolution).r;
+    if (orient > 0.12) {
+      vec3 c = cellColor(microSize, microCenter);
+      float lum = dot(c, vec3(0.2126, 0.7152, 0.0722)) * uExposure;
+      lum = clamp(0.5 + (lum - 0.5) * uContrast, 0.0, 1.0);
+      float cellIdx = orient < 0.375 ? 3.0   // '-'
+                    : orient < 0.625 ? 11.0  // '|'
+                    : orient < 0.875 ? 5.0   // '+'
+                    : 12.0;                  // 'o'
+      vec2 inCell = fract(gl_FragCoord.xy / microSize);
+      float mask = texture2D(tGlyphs, vec2((cellIdx + inCell.x) / 16.0, inCell.y)).a;
+      float maxc = max(c.r, max(c.g, c.b));
+      vec3 chroma = c / max(maxc, 1e-4);
+      vec3 col = uVoid + under;
+      if (lum > 0.03) col += mask * chroma * (0.25 + 0.75 * lum);
+      gl_FragColor = vec4(toSrgb(col * uGlobalDim), 1.0);
+      return;
+    }
+  }
+
+  // organic macro path (luminance-ramp glyphs)
+  vec2 cell = floor(gl_FragCoord.xy / cellSize);
+  vec2 centerPx = (cell + 0.5) * cellSize;
+  vec3 c = cellColor(cellSize, centerPx);
   float lum = dot(c, vec3(0.2126, 0.7152, 0.0722)) * uExposure;
   lum = clamp(0.5 + (lum - 0.5) * uContrast, 0.0, 1.0);
   int index = int(clamp(floor(lum * 10.0), 0.0, 9.0));
@@ -219,8 +234,6 @@ void main(){
   float maxc = max(c.r, max(c.g, c.b));
   vec3 chroma = c / max(maxc, 1e-4); // preserve scene chroma
   vec3 glyphRGB = chroma * (0.35 + 0.65 * (float(index) / 9.0));
-  vec3 under = aces(texture2D(tUnder, gl_FragCoord.xy / uResolution).rgb)
-             * uUnderlayer * min(uExposure, 1.0);
   vec3 col = uVoid + under;
   if (index > 0) col += mask * glyphRGB;
   col *= uGlobalDim;
