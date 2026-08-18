@@ -57,7 +57,10 @@ function detectEnv(): Env {
   let ok = false;
   try {
     const c = document.createElement("canvas");
-    ok = !!(window.WebGL2RenderingContext && c.getContext("webgl2"));
+    const gl2 = c.getContext("webgl2");
+    ok = !!(window.WebGL2RenderingContext && gl2);
+    // release the probe context immediately — browsers cap ~16 live contexts
+    gl2?.getExtension("WEBGL_lose_context")?.loseContext();
   } catch {
     ok = false;
   }

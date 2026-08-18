@@ -5,7 +5,7 @@
   --void: #050508;
   --ink: #f4f4f6;
   --dim: rgba(244, 244, 246, 0.62);
-  --faint: rgba(244, 244, 246, 0.38);
+  --faint: rgba(244, 244, 246, 0.5); /* ≥4.5:1 on --void (WCAG AA at small sizes) */
   --hairline: rgba(255, 255, 255, 0.08);
   --glass: rgba(255, 255, 255, 0.03);
   --scrim: rgba(5, 5, 8, 0.72);

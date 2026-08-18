@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Component, useEffect, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Lenis from "lenis";
 import CursorDot from "@/components/signal/CursorDot";
@@ -9,6 +9,17 @@ import { setScrollProgress } from "@/components/signal/scrollBus";
 const SignalField = dynamic(() => import("@/components/signal/SignalField"), {
   ssr: false,
 });
+
+/** A GPU hiccup loses the background, never the page. */
+class SignalBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 /**
  * Mounts the fixed ASCII canvas + cursor dot and drives the scroll bus:
@@ -38,9 +49,9 @@ export default function SignalLayer() {
   }, []);
 
   return (
-    <>
+    <SignalBoundary>
       <SignalField externalScroll />
       <CursorDot />
-    </>
+    </SignalBoundary>
   );
 }
