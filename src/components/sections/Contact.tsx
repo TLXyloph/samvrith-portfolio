@@ -32,7 +32,7 @@ export default function Contact() {
         <div className="mt-8 flex flex-wrap items-center gap-8">
           <ArrowLink href={identity.github} label="github" />
           <p className="font-mono text-[12px] text-faint">
-            saratoga, ca <span aria-hidden="true">→</span> west lafayette, in
+            san francisco, ca <span aria-hidden="true">→</span> west lafayette, in
           </p>
         </div>
       </Reveal>

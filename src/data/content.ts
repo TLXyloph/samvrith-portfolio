@@ -36,7 +36,7 @@ export type Role = {
 export const identity = {
   name: "Samvrith Bandi",
   thesis: "from microvolts to meaning",
-  eyebrow: "~/saratoga-ca → ~/west-lafayette-in",
+  eyebrow: "~/san-francisco-ca → ~/west-lafayette-in",
   headline:
     "Neuromorphic computing, agentic AI, and the biosignal interfaces between them — spiking-network tooling, custom sensor hardware, and agents that act on what they decode.",
   summary:
