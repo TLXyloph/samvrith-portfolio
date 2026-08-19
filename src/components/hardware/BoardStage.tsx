@@ -438,17 +438,17 @@ export default function BoardStage({ hw, beat, active, reduced, onError }: Board
       >
         <div
           ref={armRef}
-          className="flex items-center gap-1"
-          style={{ transform: "translate(-1.5px, -50%)" }}
+          className="flex items-center gap-1.5"
+          style={{ transform: "translate(-2.5px, -50%)" }}
         >
           <span
             ref={dotRef}
-            className="h-[3px] w-[3px] shrink-0 rounded-full bg-sig-iris"
+            className="h-[5px] w-[5px] shrink-0 rounded-full bg-sig-iris"
           />
-          <span ref={leaderRef} className="h-px w-3.5 shrink-0 bg-white/25" />
+          <span ref={leaderRef} className="h-px w-5 shrink-0 bg-white/40" />
           <span
             ref={textRef}
-            className="font-mono text-[11px] tracking-[0.14em] whitespace-nowrap text-faint"
+            className="rounded-md border border-hairline bg-void/80 px-2.5 py-1 font-mono text-[14px] tracking-[0.08em] whitespace-nowrap text-ink"
           />
         </div>
       </div>
