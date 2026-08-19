@@ -180,3 +180,20 @@ export function buildBackplane(): THREE.BufferGeometry {
   geo.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
   return geo;
 }
+
+/**
+ * v6: seam cap — closes the silicon variant's open hemisphere cut so
+ * rotation poses read as a SOLID organ, and integrates the organ with
+ * the board: the cut face is UV-mapped to the painted PCB texture, so
+ * the brain's cross-section reads as a silicon die fused to the board.
+ * Ellipse sized to tuck just inside the shell at the seam (groove pulls
+ * the shell in up to ~10% dorsally); the ASCII grid hides the margin.
+ */
+export function buildSeamCap(): THREE.BufferGeometry {
+  const geo = new THREE.CircleGeometry(1, 48);
+  // circle starts in the XY plane: x → sagittal depth (z), y stays up
+  geo.scale(1.0, 0.86, 1); // rz 1.0 · ry 0.86
+  geo.rotateY(-Math.PI / 2); // plane → YZ, at the clip plane
+  geo.translate(-0.031, -0.03, -0.01);
+  return geo;
+}

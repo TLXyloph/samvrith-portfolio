@@ -28,7 +28,13 @@ import {
   STAR_FRAG,
 } from "./shaders";
 import { createStarPositions, mulberry32, STAR_COUNT, type BrainData } from "./brain";
-import { buildBrainSurface, buildBackplane, buildCerebellum, buildBrainstem } from "./surface";
+import {
+  buildBrainSurface,
+  buildBackplane,
+  buildCerebellum,
+  buildBrainstem,
+  buildSeamCap,
+} from "./surface";
 import { buildPcbTexture } from "./pcbTexture";
 import { SpikeSystem } from "./Spikes";
 import type { FieldState } from "./state";
@@ -153,6 +159,8 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
   let backGeo: THREE.BufferGeometry | null = null;
   let backMat: THREE.MeshBasicMaterial | null = null;
   let backMatRear: THREE.MeshBasicMaterial | null = null;
+  let capGeo: THREE.BufferGeometry | null = null;
+  let capMat: THREE.MeshBasicMaterial | null = null;
   let pcbTex: THREE.CanvasTexture | null = null;
   if (data.silicon) {
     // painted PCB image behind the traces — its underlayer blur is the
@@ -179,6 +187,19 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
     const backRear = new THREE.Mesh(backGeo, backMatRear);
     backRear.frustumCulled = false;
     spin.add(backRear);
+
+    // v6 seam cap: closes the hollow hemisphere cut — the cross-section
+    // face carries the painted board, fusing the organ into the PCB.
+    // depthWrite ON so it occludes the shell's inner wall from any pose.
+    capGeo = buildSeamCap();
+    capMat = new THREE.MeshBasicMaterial({
+      map: pcbTex,
+      side: THREE.DoubleSide,
+      color: new THREE.Color(0.42, 0.42, 0.48),
+    });
+    const cap = new THREE.Mesh(capGeo, capMat);
+    cap.frustumCulled = false;
+    spin.add(cap);
 
     sgeo = new THREE.BufferGeometry();
     sgeo.setAttribute("position", new THREE.BufferAttribute(data.silicon.positions, 3));
@@ -289,6 +310,8 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
       backGeo?.dispose();
       backMat?.dispose();
       backMatRear?.dispose();
+      capGeo?.dispose();
+      capMat?.dispose();
       pcbTex?.dispose();
       spikes.dispose();
       starGeo.dispose();

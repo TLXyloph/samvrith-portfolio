@@ -76,7 +76,9 @@ void main(){
   float crest = clamp(vFold, 0.0, 1.0);
   float shade = mix(0.4, 1.32, pow(crest, 1.15));
   vec3 col = uColBase * (0.24 + 0.80 * ndl) * shade;
-  if (!gl_FrontFacing) col *= 0.4; // fake translucency
+  // interior faces go DARK: paired with the silicon seam cap this keeps
+  // rotation poses reading as a solid organ, never a lit hollow shell
+  if (!gl_FrontFacing) col *= 0.16;
   // fresnel rim as emissive — draws the ASCII silhouette
   vec3 V = normalize(-vViewPos);
   float fres = pow(1.0 - abs(dot(N, V)), 2.2) * 1.15;
