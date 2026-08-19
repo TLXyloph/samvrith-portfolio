@@ -22,9 +22,11 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { hardwareBeats } from "@/data/content";
 import {
+  BEAT_COUNT,
   BEAT_POSES,
   BOARD_WIDTH,
   MOMENTUM_GAIN,
+  SCRUB_GAIN,
   buildAnchors,
   orbitPosition,
   springStep,
@@ -100,6 +102,8 @@ function spring(v: number): SpringState {
 interface RigRefs {
   callout: React.RefObject<HTMLDivElement | null>;
   arm: React.RefObject<HTMLDivElement | null>;
+  dot: React.RefObject<HTMLSpanElement | null>;
+  leader: React.RefObject<HTMLSpanElement | null>;
   text: React.RefObject<HTMLSpanElement | null>;
 }
 
@@ -203,8 +207,15 @@ function StageRig({
     st.prevP = p;
 
     // — critically-damped pose chase + the scroll sling into θ —
+    // sub-beat scrub keeps the board revolving WITH the scroll: scroll
+    // position inside the beat window (−0.5..0.5 around its center)
+    // biases the θ target, so slow scrolling turns the board and the
+    // spring parks it back on the pose when scrolling stops
+    const beatF = p * (BEAT_COUNT - 1);
+    const sub = Math.min(0.5, Math.max(-0.5, beatF - beat));
+    const thetaTarget = pose.theta + (reduced ? 0 : sub * SCRUB_GAIN);
     if (reduced || dt <= 0) {
-      st.theta.v = pose.theta;
+      st.theta.v = thetaTarget;
       st.phi.v = pose.phi;
       st.radius.v = pose.radius;
       st.tx.v = tgt.x;
@@ -213,7 +224,7 @@ function StageRig({
       st.theta.vel = st.phi.vel = st.radius.vel = 0;
       st.tx.vel = st.ty.vel = st.tz.vel = 0;
     } else {
-      springStep(st.theta, pose.theta, dt);
+      springStep(st.theta, thetaTarget, dt);
       st.theta.vel += st.scrollVel * MOMENTUM_GAIN * dt; // the sling
       springStep(st.phi, pose.phi, dt);
       springStep(st.radius, pose.radius, dt);
@@ -221,10 +232,13 @@ function StageRig({
       springStep(st.ty, tgt.y, dt);
       springStep(st.tz, tgt.z, dt);
     }
+    // "near the (scrubbed) target": loose enough that a slow scrub keeps
+    // the label pinned while the board turns; beat transits and fast
+    // flings still hide it until the spring catches up
     const settled =
-      Math.abs(pose.theta - st.theta.v) < 0.06 &&
-      Math.abs(st.theta.vel) < 0.3 &&
-      Math.abs(pose.radius - st.radius.v) < 0.12;
+      Math.abs(thetaTarget - st.theta.v) < 0.2 &&
+      Math.abs(st.theta.vel) < 0.9 &&
+      Math.abs(pose.radius - st.radius.v) < 0.25;
 
     // — slow idle float (board only; the camera target ignores the bob) —
     const float = floatRef.current;
@@ -238,11 +252,15 @@ function StageRig({
     state.camera.position.copy(st.camPos);
     state.camera.lookAt(st.target);
 
-    // — the beat's callout, projected to container px —
+    // — the beat's callout, projected to container px; the entrance is
+    // ANIMATED: the dot pops, the leader draws out from it, the text
+    // wipes in alongside — all driven by the eased reveal each frame —
     const el = refs.callout.current;
     const arm = refs.arm.current;
+    const dot = refs.dot.current;
+    const leader = refs.leader.current;
     const txt = refs.text.current;
-    if (el && arm && txt && float) {
+    if (el && arm && dot && leader && txt && float) {
       const kIn = reduced ? 1 : 1 - Math.exp(-6 * Math.max(dt, 1e-3));
       const kOut = reduced ? 1 : 1 - Math.exp(-9 * Math.max(dt, 1e-3));
       if (st.displayed !== beat && st.o < 0.02) st.displayed = beat;
@@ -264,6 +282,14 @@ function StageRig({
       arm.style.transform = flip
         ? "translate(calc(-100% + 1.5px), -50%)"
         : "translate(-1.5px, -50%)";
+      // entrance choreography from the reveal value
+      const rv = st.o * st.o * (3 - 2 * st.o); // smoothstep the fade
+      dot.style.transform = `scale(${(0.25 + 0.75 * rv).toFixed(3)})`;
+      leader.style.transformOrigin = flip ? "right center" : "left center";
+      leader.style.transform = `scaleX(${rv.toFixed(3)})`;
+      const cut = ((1 - rv) * 100).toFixed(1);
+      txt.style.clipPath = flip ? `inset(0 0 0 ${cut}%)` : `inset(0 ${cut}% 0 0)`;
+      txt.style.transform = `translateX(${((1 - rv) * (flip ? 8 : -8)).toFixed(2)}px)`;
     }
   });
 
@@ -311,6 +337,8 @@ export default function BoardStage({ hw, beat, active, reduced, onError }: Board
   const [revealed, setRevealed] = useState(false);
   const calloutRef = useRef<HTMLDivElement>(null);
   const armRef = useRef<HTMLDivElement>(null);
+  const dotRef = useRef<HTMLSpanElement>(null);
+  const leaderRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const [dpr] = useState(() =>
     typeof window === "undefined" ? 1 : Math.min(window.devicePixelRatio || 1, 2),
@@ -382,7 +410,13 @@ export default function BoardStage({ hw, beat, active, reduced, onError }: Board
               model={model}
               hw={hw}
               reduced={reduced}
-              refs={{ callout: calloutRef, arm: armRef, text: textRef }}
+              refs={{
+                callout: calloutRef,
+                arm: armRef,
+                dot: dotRef,
+                leader: leaderRef,
+                text: textRef,
+              }}
             />
           </Canvas>
         </div>
@@ -407,8 +441,11 @@ export default function BoardStage({ hw, beat, active, reduced, onError }: Board
           className="flex items-center gap-1"
           style={{ transform: "translate(-1.5px, -50%)" }}
         >
-          <span className="h-[3px] w-[3px] shrink-0 rounded-full bg-sig-iris" />
-          <span className="h-px w-3.5 shrink-0 bg-white/25" />
+          <span
+            ref={dotRef}
+            className="h-[3px] w-[3px] shrink-0 rounded-full bg-sig-iris"
+          />
+          <span ref={leaderRef} className="h-px w-3.5 shrink-0 bg-white/25" />
           <span
             ref={textRef}
             className="font-mono text-[11px] tracking-[0.14em] whitespace-nowrap text-faint"

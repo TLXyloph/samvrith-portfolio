@@ -30,6 +30,15 @@ export const SPRING_DAMP = 1.0;
 /** Section-local scroll velocity → θ angular-velocity injection. */
 export const MOMENTUM_GAIN = 1.2;
 
+/**
+ * v6: continuous scrub — within a beat, sub-beat scroll progress
+ * (−0.5..0.5 around the beat center) adds to the θ target, so the board
+ * visibly REVOLVES with the scroll instead of only stepping pose to
+ * pose; the spring still owns the motion and parks on the pose when
+ * scrolling stops.
+ */
+export const SCRUB_GAIN = 0.38;
+
 /** Normalized board width in world units (X = electrode → output edge). */
 export const BOARD_WIDTH = 3.4;
 
