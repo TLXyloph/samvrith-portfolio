@@ -30,6 +30,7 @@ import * as THREE from "three";
 import { Cortex } from "./Cortex";
 import { Motes } from "./Motes";
 import { AsciiPipeline } from "./AsciiPipeline";
+import { AnnotationPublisher } from "./Annotations";
 import {
   getFocus,
   getScrollProgress,
@@ -66,6 +67,14 @@ export interface SignalFieldProps {
   glyphMin?: number;
   /** Variable glyph size gain per luminance tier (default 0.4). */
   glyphGain?: number;
+  /** v5 pose spring natural frequency ω rad/s (default 3.2). */
+  springStiffness?: number;
+  /** v5 pose spring damping ratio, 1 = critical (default 1). */
+  springDamping?: number;
+  /** v5 scroll-momentum → yaw velocity gain (default 2.5). */
+  momentumGain?: number;
+  /** v5 publish 3D-anchored labels to the annotationBus (default true). */
+  annotations?: boolean;
 }
 
 interface Env {
@@ -140,6 +149,29 @@ function Driver({ fs }: { fs: FieldState }) {
     }
     prevP.current = p;
     const rippleBoost = 1 + 5 * Math.min(Math.abs(fs.scrollVel) * fs.rippleGain, 1);
+
+    // — v5 pose spring: chase the discrete section pose (yaw/pitch) with a
+    // critically-damped spring; scroll velocity is slung into yaw angular
+    // velocity so fast scrolling overshoots and settles with weight —
+    fs.yawTarget = sample.yaw;
+    fs.pitchTarget = sample.pitch;
+    fs.section = sample.section;
+    if (fs.reduced || dt <= 0) {
+      fs.poseYaw = sample.yaw;
+      fs.posePitch = sample.pitch;
+      fs.poseYawVel = 0;
+      fs.posePitchVel = 0;
+      fs.settled = true;
+    } else {
+      const w = fs.springHz;
+      const z = fs.springDamp;
+      fs.poseYawVel += (w * w * (sample.yaw - fs.poseYaw) - 2 * w * z * fs.poseYawVel) * dt;
+      fs.posePitchVel += (w * w * (sample.pitch - fs.posePitch) - 2 * w * z * fs.posePitchVel) * dt;
+      fs.poseYawVel += fs.scrollVel * fs.momentumGain * dt; // the sling
+      fs.poseYaw += fs.poseYawVel * dt;
+      fs.posePitch += fs.posePitchVel * dt;
+      fs.settled = Math.abs(sample.yaw - fs.poseYaw) < 0.12 && Math.abs(fs.poseYawVel) < 0.4;
+    }
 
     if (fs.reduced) {
       fs.time = 11.0; // frozen, composed pose
@@ -269,6 +301,10 @@ export default function SignalField({
   rippleGain,
   glyphMin,
   glyphGain,
+  springStiffness,
+  springDamping,
+  momentumGain,
+  annotations,
 }: SignalFieldProps) {
   const [env] = useState(detectEnv);
   const [reduced, setReduced] = useState(env.reduced);
@@ -321,7 +357,11 @@ export default function SignalField({
     fs.rippleGain = rippleGain ?? 4;
     fs.glyphMin = glyphMin ?? 0.85;
     fs.glyphGain = glyphGain ?? 0.45;
-  }, [fs, env.fine, cellPx, exposure, underlayer, rippleGain, glyphMin, glyphGain]);
+    fs.springHz = springStiffness ?? 3.2;
+    fs.springDamp = springDamping ?? 1;
+    fs.momentumGain = momentumGain ?? 2.5;
+    fs.annotationsOn = annotations ?? true;
+  }, [fs, env.fine, cellPx, exposure, underlayer, rippleGain, glyphMin, glyphGain, springStiffness, springDamping, momentumGain, annotations]);
 
   // reduced-motion preference may change at runtime
   useEffect(() => {
@@ -420,6 +460,7 @@ export default function SignalField({
         <Driver fs={fs} />
         <CameraRig fs={fs} />
         <Cortex fs={fs} data={data} />
+        <AnnotationPublisher fs={fs} data={data} />
         {!reduced && <Motes fs={fs} />}
         <AsciiPipeline fs={fs} />
         <LoopGovernor

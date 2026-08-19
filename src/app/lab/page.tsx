@@ -10,6 +10,7 @@ import { useState } from "react";
 import { setScrollProgress, setFocus, type FocusId } from "@/components/signal/scrollBus";
 import type { SignalVariant } from "@/components/signal/brain";
 import CursorDot from "@/components/signal/CursorDot";
+import AnnotationLayer from "@/components/ui/AnnotationLayer";
 
 const SignalField = dynamic(() => import("@/components/signal/SignalField"), {
   ssr: false,
@@ -69,6 +70,10 @@ export default function LabPage() {
   const [rippleGain, setRippleGain] = useState(4);
   const [glyphMin, setGlyphMin] = useState(0.85);
   const [glyphGain, setGlyphGain] = useState(0.45);
+  const [stiffness, setStiffness] = useState(3.2);
+  const [damping, setDamping] = useState(1);
+  const [momentum, setMomentum] = useState(2.5);
+  const [annotationsOn, setAnnotationsOn] = useState(true);
   const [variant, setVariant] = useState<SignalVariant>("silicon");
   const [focus, setFocusState] = useState<FocusId>(null);
   const [overrideOn, setOverrideOn] = useState(false);
@@ -91,8 +96,13 @@ export default function LabPage() {
         rippleGain={rippleGain}
         glyphMin={glyphMin}
         glyphGain={glyphGain}
+        springStiffness={stiffness}
+        springDamping={damping}
+        momentumGain={momentum}
+        annotations={annotationsOn}
         clusterOverride={overrideOn ? cluster : undefined}
       />
+      <AnnotationLayer />
       <CursorDot />
       <div className="fixed bottom-4 left-4 z-10 w-72 space-y-3 border border-white/10 bg-black/70 p-4 font-mono text-[11px] backdrop-blur">
         <div className="flex items-baseline justify-between">
@@ -191,6 +201,40 @@ export default function LabPage() {
           display={glyphGain.toFixed(2)}
           onChange={setGlyphGain}
         />
+        <Slider
+          label="stiffness"
+          min={1}
+          max={8}
+          step={0.05}
+          value={stiffness}
+          display={stiffness.toFixed(2)}
+          onChange={setStiffness}
+        />
+        <Slider
+          label="damping"
+          min={0.5}
+          max={1.5}
+          step={0.01}
+          value={damping}
+          display={damping.toFixed(2)}
+          onChange={setDamping}
+        />
+        <Slider
+          label="momentum"
+          min={0}
+          max={8}
+          step={0.1}
+          value={momentum}
+          display={momentum.toFixed(1)}
+          onChange={setMomentum}
+        />
+        <div className="flex gap-2">
+          <Toggle
+            active={annotationsOn}
+            label="annotations"
+            onClick={() => setAnnotationsOn(!annotationsOn)}
+          />
+        </div>
       </div>
     </main>
   );

@@ -152,6 +152,7 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
   let idMat: THREE.ShaderMaterial | null = null;
   let backGeo: THREE.BufferGeometry | null = null;
   let backMat: THREE.MeshBasicMaterial | null = null;
+  let backMatRear: THREE.MeshBasicMaterial | null = null;
   let pcbTex: THREE.CanvasTexture | null = null;
   if (data.silicon) {
     // painted PCB image behind the traces — its underlayer blur is the
@@ -166,6 +167,18 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
     const back = new THREE.Mesh(backGeo, backMat);
     back.frustumCulled = false;
     spin.add(back);
+    // v5 rotation poses can show the board from behind — a dimmed
+    // BackSide twin keeps the rear view a hazy board instead of a hole
+    backMatRear = new THREE.MeshBasicMaterial({
+      map: pcbTex,
+      vertexColors: true,
+      depthWrite: false,
+      side: THREE.BackSide,
+      color: new THREE.Color(0.42, 0.42, 0.42),
+    });
+    const backRear = new THREE.Mesh(backGeo, backMatRear);
+    backRear.frustumCulled = false;
+    spin.add(backRear);
 
     sgeo = new THREE.BufferGeometry();
     sgeo.setAttribute("position", new THREE.BufferAttribute(data.silicon.positions, 3));
@@ -175,6 +188,7 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
       vertexShader: TRACE_VERT,
       fragmentShader: TRACE_FRAG,
       depthWrite: false,
+      side: THREE.DoubleSide, // rear view: dimmed in-shader, never a hole
       uniforms: {
         uTime: { value: 0 },
         uSync: { value: 0 },
@@ -195,6 +209,7 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
       vertexShader: TRACE_ID_VERT,
       fragmentShader: TRACE_ID_FRAG,
       blending: THREE.NoBlending,
+      side: THREE.DoubleSide, // micro glyphs persist on the rear view
     });
     const idMesh = new THREE.Mesh(sgeo, idMat);
     idMesh.frustumCulled = false;
@@ -273,6 +288,7 @@ function buildCortex(data: BrainData, fs: FieldState): CortexAssets {
       idMat?.dispose();
       backGeo?.dispose();
       backMat?.dispose();
+      backMatRear?.dispose();
       pcbTex?.dispose();
       spikes.dispose();
       starGeo.dispose();
@@ -287,11 +303,14 @@ export function Cortex({ fs, data }: { fs: FieldState; data: BrainData }) {
   const assets = useMemo(() => buildCortex(data, fs), [data, fs]);
   useEffect(() => () => assets.dispose(), [assets]);
 
-  // register the ID scene for the pipeline while mounted
+  // register the ID scene for the pipeline + the rotating rig for the
+  // annotation publisher while mounted
   useEffect(() => {
     fs.idScene = assets.idScene;
+    fs.spinObj = assets.spin;
     return () => {
       fs.idScene = null;
+      fs.spinObj = null;
     };
   }, [fs, assets]);
 
@@ -300,14 +319,11 @@ export function Cortex({ fs, data }: { fs: FieldState; data: BrainData }) {
     inner.position.copy(fs.objPos);
     inner.scale.setScalar(fs.objScale);
     inner.rotation.y = fs.camYaw * -0.1; // layered orbital parallax
-    if (fs.variant === "silicon") {
-      // gentle breathing wander — the seam stays readable
-      assets.spin.rotation.y = fs.reduced ? 0 : Math.sin(fs.time * 0.05) * 0.12;
-    } else if (fs.reduced) {
-      assets.spin.rotation.y = 0.35;
-    } else {
-      assets.spin.rotation.y += 0.04 * fs.dt; // slow auto-rotate
-    }
+    // v5: the scroll choreography IS the rotation — the driver's spring
+    // pose plus a tiny breathing wander (both variants share the poses)
+    const wander = fs.reduced ? 0 : Math.sin(fs.time * 0.05) * 0.05;
+    assets.spin.rotation.y = fs.poseYaw + wander;
+    assets.spin.rotation.x = fs.posePitch;
     assets.starRig.rotation.y = fs.camYaw * 0.3;
 
     for (const m of assets.brainMats) {

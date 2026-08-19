@@ -6,7 +6,7 @@
  * site's real parts), bus bundles, pin fan-outs, 0402 passives, stitching
  * vias, mounting holes and fiducials.
  */
-import { SIL_CELL, type SiliconData } from "./brain";
+import { mulberry32, shellZ, SIL_CELL, type SiliconData } from "./brain";
 import { PCB_U0, PCB_U1, PCB_V } from "./surface";
 
 export const W = 1320;
@@ -321,6 +321,23 @@ export function placePassives(occ: Set<number>, ics: IC[], rand: () => number): 
     if (out.some((p) => Math.hypot(p.x - x, p.y - y) < 2.2 * CELL)) continue;
     if (MOUNTS.some((m) => Math.hypot(m.x - x, m.y - y) < 2.2 * CELL)) continue;
     out.push({ x, y, horiz: rand() < 0.5, label: out.length < LABELS.length ? LABELS[out.length] : null });
+  }
+  return out;
+}
+
+/**
+ * Deterministic re-derivation of the painted IC positions (identical seed
+ * and draw order as buildPcbTexture: occupancy consumes no randomness,
+ * placeICs is the first consumer of mulberry32(9091)) → object-space
+ * anchor points for the annotation layer, keyed by ref ("U1", "U2", "U3").
+ */
+export function getIcAnchors(silicon: SiliconData): Record<string, { u: number; v: number; z: number }> {
+  const ics = placeICs(occupancy(silicon), mulberry32(9091));
+  const out: Record<string, { u: number; v: number; z: number }> = {};
+  for (const ic of ics) {
+    const u = (ic.cx / W) * (PCB_U1 - PCB_U0) + PCB_U0;
+    const v = 1 - (2 * ic.cy) / H;
+    out[ic.ref] = { u, v, z: shellZ(u, v) + 0.05 };
   }
   return out;
 }

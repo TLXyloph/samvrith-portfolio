@@ -43,6 +43,25 @@ export interface FieldState {
   /** v3 variable glyph size (macro grid): scale = min + gain·(index/9). */
   glyphMin: number;
   glyphGain: number;
+  /** v5 rotation choreography: critically-damped spring chasing the
+   * discrete section pose, with scroll momentum slung into yaw velocity. */
+  poseYaw: number;
+  poseYawVel: number;
+  posePitch: number;
+  posePitchVel: number;
+  yawTarget: number;
+  pitchTarget: number;
+  /** Discrete section index 0..5 (hero…contact). */
+  section: number;
+  /** True once the spring is near its pose — labels fade in when settled. */
+  settled: boolean;
+  springHz: number; // spring natural frequency ω (rad/s)
+  springDamp: number; // damping ratio (1 = critical)
+  momentumGain: number; // scrollVel → yaw angular-velocity injection
+  /** v5 annotation publishing (annotationBus) on/off. */
+  annotationsOn: boolean;
+  /** Registered by Cortex: the rotating rig — anchors project through it. */
+  spinObj: THREE.Object3D | null;
   /** Per-cluster eased activation, indices 0..8 (organic 0–4, silicon 5–8).
    * Shader uniforms reference this array directly. */
   clusterAct: Float32Array;
@@ -85,7 +104,7 @@ export function createFieldState(): FieldState {
     contrast: 1.12,
     globalDim: 1,
     orbitGain: 1,
-    objPos: new THREE.Vector3(1.15, 0.12, 0),
+    objPos: new THREE.Vector3(1.05, 0.1, 0),
     objScale: 1.15,
     variant: "silicon",
     accent: new THREE.Color("#8b9cf5"),
@@ -97,6 +116,19 @@ export function createFieldState(): FieldState {
     rippleGain: 4,
     glyphMin: 0.85,
     glyphGain: 0.45,
+    poseYaw: 0,
+    poseYawVel: 0,
+    posePitch: 0,
+    posePitchVel: 0,
+    yawTarget: 0,
+    pitchTarget: 0,
+    section: 0,
+    settled: true,
+    springHz: 3.2,
+    springDamp: 1,
+    momentumGain: 2.5,
+    annotationsOn: true,
+    spinObj: null,
     clusterAct: new Float32Array(9),
     focus: null,
     clusterOverride: null,
@@ -118,7 +150,8 @@ export function createFieldState(): FieldState {
 
 interface Stop {
   p: number;
-  pos: readonly [number, number, number];
+  yaw: number; // discrete pose target (spring-followed, not lerped)
+  pitch: number;
   scale: number;
   exposure: number;
   orbitGain: number;
@@ -128,15 +161,23 @@ interface Stop {
   accent: THREE.Color;
 }
 
-// v3: bigger, present, less shrink — the brain stays a protagonist.
+// v5: the fly-away/come-back translation is retired. The brain stays
+// present at a fixed position; each section is a DISCRETE POSE (yaw +
+// slight pitch) — a full revolve over the page (contact = 2π, same face
+// as hero, reached by rotating forward). Poses avoid the edge-on band
+// around ±π/2 where the silicon plane degenerates.
 const STOPS: readonly Stop[] = [
-  { p: 0.0, pos: [1.15, 0.12, 0.0], scale: 1.15, exposure: 0.95, orbitGain: 1.0, active: -1, rate: 0.35, sync: 0, accent: new THREE.Color("#8b9cf5") },
-  { p: 0.14, pos: [1.7, 0.2, -0.6], scale: 0.95, exposure: 0.85, orbitGain: 1.0, active: 0, rate: 0.5, sync: 0, accent: new THREE.Color("#9994f8") },
-  { p: 0.3, pos: [2.0, 0.3, -1.2], scale: 0.9, exposure: 0.7, orbitGain: 1.0, active: 1, rate: 0.6, sync: 0, accent: new THREE.Color("#a78bfa") },
-  { p: 0.55, pos: [2.0, 0.3, -1.2], scale: 0.9, exposure: 0.68, orbitGain: 1.0, active: 2, rate: 1.0, sync: 0, accent: new THREE.Color("#ce7fd8") },
-  { p: 0.75, pos: [2.0, 0.3, -1.2], scale: 0.9, exposure: 0.62, orbitGain: 1.0, active: 3, rate: 0.5, sync: 0, accent: new THREE.Color("#f472b6") },
-  { p: 0.92, pos: [0.0, 0.1, 0.0], scale: 1.05, exposure: 0.95, orbitGain: 0.6, active: -1, rate: 0.7, sync: 1, accent: new THREE.Color("#fb7185") },
+  { p: 0.0, yaw: 0, pitch: 0, scale: 1.15, exposure: 0.95, orbitGain: 1.0, active: -1, rate: 0.35, sync: 0, accent: new THREE.Color("#8b9cf5") },
+  { p: 0.14, yaw: 0.55, pitch: 0.12, scale: 1.05, exposure: 0.9, orbitGain: 1.0, active: 0, rate: 0.5, sync: 0, accent: new THREE.Color("#9994f8") },
+  { p: 0.3, yaw: 1.15, pitch: -0.1, scale: 1.05, exposure: 0.88, orbitGain: 1.0, active: 1, rate: 0.6, sync: 0, accent: new THREE.Color("#a78bfa") },
+  { p: 0.55, yaw: 1.9, pitch: 0.18, scale: 1.05, exposure: 0.8, orbitGain: 1.0, active: 2, rate: 1.0, sync: 0, accent: new THREE.Color("#ce7fd8") },
+  { p: 0.75, yaw: 2.7, pitch: -0.14, scale: 1.05, exposure: 0.88, orbitGain: 1.0, active: 3, rate: 0.5, sync: 0, accent: new THREE.Color("#f472b6") },
+  { p: 0.92, yaw: Math.PI * 2, pitch: 0, scale: 1.05, exposure: 0.95, orbitGain: 0.6, active: -1, rate: 0.7, sync: 1, accent: new THREE.Color("#fb7185") },
 ];
+
+/** Fixed on-screen home of the brain (v5 — no translation choreography). */
+const HOME_X = 1.05;
+const HOME_Y = 0.1;
 
 function smooth(u: number): number {
   const t = u < 0 ? 0 : u > 1 ? 1 : u;
@@ -152,6 +193,11 @@ export interface StopSample {
   rate: number;
   sync: number;
   accent: THREE.Color;
+  /** Discrete pose targets — the driver's spring chases these. */
+  yaw: number;
+  pitch: number;
+  /** Discrete section index 0..5 (hero…contact) for label selection. */
+  section: number;
 }
 
 export function createStopSample(): StopSample {
@@ -164,39 +210,43 @@ export function createStopSample(): StopSample {
     rate: 0.35,
     sync: 0,
     accent: new THREE.Color("#8b9cf5"),
+    yaw: 0,
+    pitch: 0,
+    section: 0,
   };
 }
 
 /**
- * Evaluate the choreography at scroll progress p (0..1), smoothstep-lerped
- * between neighboring stops (activeCluster switches discretely mid-segment;
- * the per-cluster easing in the driver smooths the handover). On narrow
- * viewports (<768px) objPos.x is multiplied by 0.3.
+ * Evaluate the choreography at scroll progress p (0..1). Scale/exposure/
+ * orbit lerp smoothly; yaw/pitch/section/activeCluster switch DISCRETELY
+ * mid-segment (the driver's spring + per-cluster easing smooth them). On
+ * narrow viewports (<768px) the home x is multiplied by 0.3.
  */
 export function evaluateStops(p: number, narrow: boolean, out: StopSample): StopSample {
   const q = p < 0 ? 0 : p > 1 ? 1 : p;
   let a = STOPS[0];
   let b = STOPS[0];
+  let ai = 0;
   for (let i = 0; i < STOPS.length; i++) {
     if (q >= STOPS[i].p) {
       a = STOPS[i];
+      ai = i;
       b = i + 1 < STOPS.length ? STOPS[i + 1] : STOPS[i];
     }
   }
   const span = b.p - a.p;
   const u = span > 0 ? smooth((q - a.p) / span) : 0;
   const xMul = narrow ? 0.3 : 1;
-  out.pos.set(
-    (a.pos[0] + (b.pos[0] - a.pos[0]) * u) * xMul,
-    a.pos[1] + (b.pos[1] - a.pos[1]) * u,
-    a.pos[2] + (b.pos[2] - a.pos[2]) * u,
-  );
+  out.pos.set(HOME_X * xMul, HOME_Y, 0);
   out.scale = a.scale + (b.scale - a.scale) * u;
   out.exposure = a.exposure + (b.exposure - a.exposure) * u;
   out.orbitGain = a.orbitGain + (b.orbitGain - a.orbitGain) * u;
   out.rate = a.rate + (b.rate - a.rate) * u;
   out.sync = a.sync + (b.sync - a.sync) * u;
   out.active = u < 0.5 ? a.active : b.active;
+  out.yaw = u < 0.5 ? a.yaw : b.yaw;
+  out.pitch = u < 0.5 ? a.pitch : b.pitch;
+  out.section = u < 0.5 ? ai : Math.min(ai + 1, STOPS.length - 1);
   out.accent.copy(a.accent).lerp(b.accent, u);
   return out;
 }

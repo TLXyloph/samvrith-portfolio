@@ -148,7 +148,10 @@ void main(){
 export const TRACE_FRAG = /* glsl */ `
 varying vec3 vColor;
 void main(){
-  gl_FragColor = vec4(vColor, 1.0);
+  vec3 c = vColor;
+  // v5 rotation can show the board's rear — dim, never broken
+  if (!gl_FrontFacing) c *= 0.35;
+  gl_FragColor = vec4(c, 1.0);
 }
 `;
 
