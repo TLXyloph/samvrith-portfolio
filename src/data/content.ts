@@ -76,7 +76,7 @@ export const projects: Project[] = [
     ],
     stack: ["KiCad", "AD8226", "RP2040", "PyTorch", "ONNX Runtime", "Orange Pi 5"],
     featured: true,
-    note: "Board at fab · June 2026 – present",
+    note: "2-ch rev A in layout · 2026",
   },
   {
     slug: "neuromcp",
