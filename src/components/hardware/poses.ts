@@ -72,7 +72,8 @@ export type AnchorKey =
   | "u1" // AD8226 in-amp, CH1 row
   | "u2" // MCP6002 gain/filter stage, CH1 row
   | "gain" // RC band between U1 and U2
-  | "electrodes" // J1/J2 3-pin headers, left edge
+  | "electrodes" // J1/J2 midpoint — camera framing target for the left edge
+  | "j1" // CH1 electrode header itself — the label pins to a real connector
   | "j3"; // output header, right edge
 
 /**
@@ -84,7 +85,7 @@ export const BEAT_POSES: readonly BeatPose[] = [
   { theta: -0.65, phi: 1.04, radius: 6.6, target: "center", anchor: "silk" },
   { theta: -0.25, phi: 0.6, radius: 2.05, target: "u1", anchor: "u1" },
   { theta: 0.35, phi: 0.72, radius: 2.2, target: "gain", anchor: "u2" },
-  { theta: 1.05, phi: 0.4, radius: 2.4, target: "electrodes", anchor: "electrodes" },
+  { theta: 1.05, phi: 0.4, radius: 2.4, target: "electrodes", anchor: "j1" },
   { theta: 1.75, phi: 0.52, radius: 2.3, target: "j3", anchor: "j3" },
 ];
 
@@ -102,7 +103,7 @@ export const ANCHOR_LIFT: Partial<Record<AnchorKey, number>> = {
   u1: 0.16,
   u2: 0.16,
   gain: 0.14,
-  electrodes: 0.5, // 2.54 mm headers stand tall
+  j1: 0.28, // pin to the header body top, not the air above the bare edge
   j3: 0.48,
   silk: 0.05,
 };
@@ -145,6 +146,7 @@ export function buildAnchors(
     gain: u1.clone().lerp(u2, 0.65),
     u2,
     electrodes: j1.clone().add(j2).multiplyScalar(0.5),
+    j1,
     j3,
   };
   for (const key of Object.keys(ANCHOR_LIFT) as AnchorKey[]) {
