@@ -58,9 +58,7 @@ export interface FieldState {
   springHz: number; // spring natural frequency ω (rad/s)
   springDamp: number; // damping ratio (1 = critical)
   momentumGain: number; // scrollVel → yaw angular-velocity injection
-  /** v5 annotation publishing (annotationBus) on/off. */
-  annotationsOn: boolean;
-  /** Registered by Cortex: the rotating rig — anchors project through it. */
+  /** Registered by Cortex: the rotating rig. */
   spinObj: THREE.Object3D | null;
   /** Per-cluster eased activation, indices 0..8 (organic 0–4, silicon 5–8).
    * Shader uniforms reference this array directly. */
@@ -127,7 +125,6 @@ export function createFieldState(): FieldState {
     springHz: 3.2,
     springDamp: 1,
     momentumGain: 2.5,
-    annotationsOn: true,
     spinObj: null,
     clusterAct: new Float32Array(9),
     focus: null,

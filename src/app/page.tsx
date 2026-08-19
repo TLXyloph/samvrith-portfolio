@@ -1,5 +1,4 @@
 import SignalLayer from "@/components/SignalLayer";
-import AnnotationLayer from "@/components/ui/AnnotationLayer";
 import ScrollProgress from "@/components/ui/ScrollProgress";
 import Nav from "@/components/sections/Nav";
 import Hero from "@/components/sections/Hero";
@@ -24,7 +23,6 @@ export default function Home() {
       <ScrollProgress />
 
       <SignalLayer />
-      <AnnotationLayer />
 
       <Nav />
 

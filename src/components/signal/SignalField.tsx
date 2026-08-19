@@ -30,7 +30,6 @@ import * as THREE from "three";
 import { Cortex } from "./Cortex";
 import { Motes } from "./Motes";
 import { AsciiPipeline } from "./AsciiPipeline";
-import { AnnotationPublisher } from "./Annotations";
 import {
   getFocus,
   getScrollProgress,
@@ -73,8 +72,6 @@ export interface SignalFieldProps {
   springDamping?: number;
   /** v5 scroll-momentum → yaw velocity gain (default 2.5). */
   momentumGain?: number;
-  /** v5 publish 3D-anchored labels to the annotationBus (default true). */
-  annotations?: boolean;
 }
 
 interface Env {
@@ -304,7 +301,6 @@ export default function SignalField({
   springStiffness,
   springDamping,
   momentumGain,
-  annotations,
 }: SignalFieldProps) {
   const [env] = useState(detectEnv);
   const [reduced, setReduced] = useState(env.reduced);
@@ -360,8 +356,7 @@ export default function SignalField({
     fs.springHz = springStiffness ?? 3.2;
     fs.springDamp = springDamping ?? 1;
     fs.momentumGain = momentumGain ?? 2.5;
-    fs.annotationsOn = annotations ?? true;
-  }, [fs, env.fine, cellPx, exposure, underlayer, rippleGain, glyphMin, glyphGain, springStiffness, springDamping, momentumGain, annotations]);
+  }, [fs, env.fine, cellPx, exposure, underlayer, rippleGain, glyphMin, glyphGain, springStiffness, springDamping, momentumGain]);
 
   // reduced-motion preference may change at runtime
   useEffect(() => {
@@ -460,7 +455,6 @@ export default function SignalField({
         <Driver fs={fs} />
         <CameraRig fs={fs} />
         <Cortex fs={fs} data={data} />
-        <AnnotationPublisher fs={fs} data={data} />
         {!reduced && <Motes fs={fs} />}
         <AsciiPipeline fs={fs} />
         <LoopGovernor
