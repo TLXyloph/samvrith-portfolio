@@ -72,6 +72,16 @@ deep-dive. Full design record: `docs/superpowers/specs/2026-08-18-portfolio-desi
   (`lsof -ti tcp:3000 -sTCP:LISTEN`, verify cwd is this repo, kill), then
   `rm -rf .next && pnpm build`, then start `next start` directly.
 - Deploy = `git push` (Vercel Hobby). `metadataBase` is set to the prod URL.
+- **When adding large binary assets to `public/`** (more GLBs, videos…):
+  Tailwind v4 auto-scans un-ignored project files for class candidates and
+  its binary heuristic misses formats like `.glb` — the 5.4MB board model
+  OOM-killed Vercel's postcss subprocess (passed locally, SIGKILL in the
+  build container; every deploy failed silently for hours). The guard is
+  already in place — `@source not "../../public";` in `globals.css` — keep
+  it, and keep new asset dirs under `public/`. After any push, glance at
+  the repo's commit status (`gh api repos/TLXyloph/samvrith-portfolio/commits/main/status --jq .state`)
+  rather than assuming green; verify prod assets by content-type, not
+  status code (a range request on Vercel's 404 page returns 206).
 
 ## What worked (keep doing)
 
