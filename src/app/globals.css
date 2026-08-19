@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* never scan static assets for class candidates — the 5.4MB board GLB in
+   public/ OOM-killed Tailwind's scanner inside Vercel's build container */
+@source not "../../public";
+
 /* ————— design tokens: color lives in the signal, chrome stays monochrome ————— */
 :root {
   --void: #050508;
