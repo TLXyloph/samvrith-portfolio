@@ -157,6 +157,42 @@ export const projects: Project[] = [
   },
 ];
 
+export type HardwareBeat = {
+  title: string;
+  body: string;
+  /** mono callout label pinned to the relevant board region */
+  callout: string;
+};
+
+/** Scroll beats for the SparseEMG board deep-dive (emg_2ch rev A). */
+export const hardwareBeats: HardwareBeat[] = [
+  {
+    title: "The board, in depth",
+    body: "emg_2ch rev A — a two-channel surface-EMG analog front-end, taken from schematic capture to fab-ready outputs in KiCad. Two identical channels on a single 3.3 V rail.",
+    callout: "[sparseemg · emg_2ch · rev a]",
+  },
+  {
+    title: "Instrumentation first",
+    body: "One AD8226 instrumentation amplifier per channel. The topology came from first principles: ADS1299 and AD620/TL072 builds were rejected as incompatible with a single 3.3 V supply.",
+    callout: "[ad8226 · in-amp, one per channel]",
+  },
+  {
+    title: "Gain and band",
+    body: "A 19 Hz high-pass into an MCP6002 gain stage with a 480 Hz low-pass — ≈800× total gain. No envelope detector: the classifier sees raw EMG.",
+    callout: "[mcp6002 · ≈800× chain]",
+  },
+  {
+    title: "Where microvolts arrive",
+    body: "E−, E+ and REF per channel. Surface electrodes deliver tens of microvolts; everything downstream exists to keep that signal honest.",
+    callout: "[electrode headers · e− e+ ref]",
+  },
+  {
+    title: "Out to the ADC",
+    body: "3V3 · GND · EMG1 · EMG2 — straight into the RP2040's ADC, where a 1D CNN-LSTM classifies gestures on-device. From copper to cognition.",
+    callout: "[output header → rp2040]",
+  },
+];
+
 export const contributions: Contribution[] = [
   {
     repo: "norse/norse",
