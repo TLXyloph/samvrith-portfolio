@@ -17,6 +17,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { hardwareBeats } from "@/data/content";
 import Reveal from "@/components/ui/Reveal";
+import { useScrollDetents } from "./detents";
 import { BEAT_COUNT, type HwProgress } from "./poses";
 
 const BoardStage = dynamic(() => import("./BoardStage"), { ssr: false });
@@ -154,11 +155,34 @@ export default function HardwareDive() {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
+  // — scroll detents: rolling stop onto each beat, one step per gesture;
+  // returns true when the native CSS-snap fallback should render instead —
+  const snapFallback = useScrollDetents(regionRef, inView, reduced);
+
   return (
     <section id="hardware" className="relative scroll-mt-24">
       <h2 className="sr-only">SparseEMG hardware</h2>
 
       <div ref={regionRef} className="relative h-[500svh]">
+        {snapFallback ? (
+          // native proximity-snap rails (reduced motion / coarse pointers):
+          // one per beat, top edges on the exact JS-detent offsets
+          // (region top + i·100svh); scroll-snap-type lives on the root,
+          // added/removed by useScrollDetents
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+            {Array.from({ length: BEAT_COUNT }, (_, i) => (
+              <div
+                key={i}
+                className="absolute inset-x-0 h-svh"
+                style={{
+                  top: `${i * 100}svh`,
+                  scrollSnapAlign: "start",
+                  scrollSnapStop: "always",
+                }}
+              />
+            ))}
+          </div>
+        ) : null}
         <div className="sticky top-0 h-svh overflow-hidden">
           {/* soft violet glow the board floats over (the in-scene contact
               shadow darkens it back down beneath the model) */}
