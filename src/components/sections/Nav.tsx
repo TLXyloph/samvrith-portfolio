@@ -7,6 +7,7 @@ import { Blink } from "@/components/ui/Glyph";
 
 const LINKS = [
   { href: "#projects", label: "projects" },
+  { href: "#hardware", label: "hardware" },
   { href: "#open-source", label: "open-source" },
   { href: "#timeline", label: "timeline" },
   { href: "#contact", label: "contact" },

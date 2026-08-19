@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { projects, type Project } from "@/data/content";
 import Section from "@/components/ui/Section";
 import Reveal from "@/components/ui/Reveal";
@@ -9,93 +8,6 @@ import TiltCard from "@/components/ui/TiltCard";
 
 const CARD_HOVER =
   "transition duration-300 hover:border-white/[0.16] hover:bg-white/[0.045]";
-
-type PcbTile = {
-  src: string;
-  width: number;
-  height: number;
-  alt: string;
-  caption: string;
-  /**
-   * Per-asset duotone onto the site's iris. The raytrace is a lit surface, so
-   * it keeps some of its own shading; the two KiCad plots are dark line art on
-   * a transparent ground, so they invert first or they'd vanish into the void.
-   */
-  filter: string;
-  /** KiCad SVGs skip the optimizer (no dangerouslyAllowSVG in next.config). */
-  unoptimized?: boolean;
-  /** The schematic needs room to read as anything but noise. */
-  wideOnly?: boolean;
-};
-
-const PCB_TILES: PcbTile[] = [
-  {
-    src: "/pcb/render-persp.png",
-    width: 1400,
-    height: 950,
-    alt: "Raytraced perspective render of the emg_2ch board",
-    caption: "emg_2ch · rev a · kicad render",
-    filter:
-      "grayscale(0.35) sepia(0.5) hue-rotate(215deg) saturate(1.15) brightness(0.95)",
-  },
-  {
-    src: "/pcb/layout.svg",
-    width: 500,
-    height: 420,
-    alt: "Copper pours and silkscreen across both layers of the emg_2ch layout",
-    caption: "copper + silk · 2 layers",
-    // The copper pour is a full-bleed field, so this darkens rather than
-    // inverts — inverted it becomes a lavender slab that shouts over the void.
-    filter:
-      "grayscale(0.3) sepia(0.7) hue-rotate(234deg) saturate(1.45) brightness(0.56)",
-    unoptimized: true,
-  },
-  {
-    src: "/pcb/schematic.svg",
-    width: 1188,
-    height: 840,
-    alt: "Analog front-end schematic with two AD8226 instrumentation amplifiers",
-    caption: "afe schematic · ad8226 ×2",
-    // Dark line art on a transparent ground: invert first or it vanishes.
-    filter: "invert(1) sepia(1) hue-rotate(212deg) saturate(1.8) brightness(1.05)",
-    unoptimized: true,
-    wideOnly: true,
-  },
-];
-
-/** The board itself, in the site's register: violet duotone over the void. */
-function PcbStrip() {
-  return (
-    <Reveal delay={0.1}>
-      <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-3">
-        {PCB_TILES.map((tile) => (
-          <figure
-            key={tile.src}
-            className={[
-              "overflow-hidden rounded-lg border border-hairline bg-white/[0.02]",
-              tile.wideOnly ? "hidden md:block" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <Image
-              src={tile.src}
-              width={tile.width}
-              height={tile.height}
-              alt={tile.alt}
-              unoptimized={tile.unoptimized}
-              className="h-36 w-full object-cover opacity-90"
-              style={{ filter: tile.filter }}
-            />
-            <figcaption className="px-2.5 py-1.5 font-mono text-[10px] text-faint">
-              {tile.caption}
-            </figcaption>
-          </figure>
-        ))}
-      </div>
-    </Reveal>
-  );
-}
 
 /** Slugs the signal layer knows how to highlight; the literal type-checks. */
 const FOCUS_TARGETS: readonly FocusTarget[] = ["sparse-emg", "neuromcp"];
@@ -108,11 +20,14 @@ const featured = projects.filter((p) => p.featured);
 const rest = projects.filter((p) => !p.featured);
 
 function Links({ project, className }: { project: Project; className?: string }) {
-  if (!project.href && !project.live) return null;
+  // the media strip's job moved to the #hardware deep-dive section
+  const dive = project.slug === "sparse-emg";
+  if (!project.href && !project.live && !dive) return null;
   return (
     <div className={["flex flex-wrap gap-6", className].filter(Boolean).join(" ")}>
       {project.href ? <ArrowLink href={project.href} label="github" /> : null}
       {project.live ? <ArrowLink href={project.live} label="live" /> : null}
+      {dive ? <ArrowLink href="#hardware" label="board deep-dive" arrow="↓" /> : null}
     </div>
   );
 }
@@ -149,8 +64,6 @@ function FeaturedCard({ project }: { project: Project }) {
           ))}
         </div>
       ) : null}
-
-      {project.slug === "sparse-emg" ? <PcbStrip /> : null}
 
       <div className="mt-7 flex flex-wrap gap-2">
         {project.stack.map((tech) => (

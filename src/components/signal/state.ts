@@ -51,9 +51,9 @@ export interface FieldState {
   posePitchVel: number;
   yawTarget: number;
   pitchTarget: number;
-  /** Discrete section index 0..5 (hero…contact). */
+  /** Discrete section index 0..6 (hero…contact, incl. hardware). */
   section: number;
-  /** True once the spring is near its pose — labels fade in when settled. */
+  /** True once the spring is near its pose. */
   settled: boolean;
   springHz: number; // spring natural frequency ω (rad/s)
   springDamp: number; // damping ratio (1 = critical)
@@ -163,13 +163,21 @@ interface Stop {
 // slight pitch) — a full revolve over the page (contact = 2π, same face
 // as hero, reached by rotating forward). Poses avoid the edge-on band
 // around ±π/2 where the silicon plane degenerates.
+//
+// v6 retune: the #hardware deep-dive (500svh, between projects and
+// open-source) grew the page — p-values recomputed against the built
+// page (hardware spans ~0.38–0.79 of scroll). The hardware stop gives
+// the brain a subtle pose of its own between projects and open-source,
+// dimmed under the board stage, with silicon block 5 (the SparseEMG
+// focus block) active — the board section IS the silicon story.
 const STOPS: readonly Stop[] = [
   { p: 0.0, yaw: 0, pitch: 0, scale: 1.15, exposure: 0.95, orbitGain: 1.0, active: -1, rate: 0.35, sync: 0, accent: new THREE.Color("#8b9cf5") },
-  { p: 0.14, yaw: 0.55, pitch: 0.12, scale: 1.05, exposure: 0.9, orbitGain: 1.0, active: 0, rate: 0.5, sync: 0, accent: new THREE.Color("#9994f8") },
-  { p: 0.3, yaw: 1.15, pitch: -0.1, scale: 1.05, exposure: 0.88, orbitGain: 1.0, active: 1, rate: 0.6, sync: 0, accent: new THREE.Color("#a78bfa") },
-  { p: 0.55, yaw: 1.9, pitch: 0.18, scale: 1.05, exposure: 0.8, orbitGain: 1.0, active: 2, rate: 1.0, sync: 0, accent: new THREE.Color("#ce7fd8") },
-  { p: 0.75, yaw: 2.7, pitch: -0.14, scale: 1.05, exposure: 0.88, orbitGain: 1.0, active: 3, rate: 0.5, sync: 0, accent: new THREE.Color("#f472b6") },
-  { p: 0.92, yaw: Math.PI * 2, pitch: 0, scale: 1.05, exposure: 0.95, orbitGain: 0.6, active: -1, rate: 0.7, sync: 1, accent: new THREE.Color("#fb7185") },
+  { p: 0.09, yaw: 0.55, pitch: 0.12, scale: 1.05, exposure: 0.9, orbitGain: 1.0, active: 0, rate: 0.5, sync: 0, accent: new THREE.Color("#9994f8") },
+  { p: 0.19, yaw: 1.15, pitch: -0.1, scale: 1.05, exposure: 0.88, orbitGain: 1.0, active: 1, rate: 0.6, sync: 0, accent: new THREE.Color("#a78bfa") },
+  { p: 0.55, yaw: 1.5, pitch: 0.06, scale: 1.05, exposure: 0.62, orbitGain: 1.0, active: 5, rate: 0.8, sync: 0, accent: new THREE.Color("#b985e9") },
+  { p: 0.82, yaw: 1.9, pitch: 0.18, scale: 1.05, exposure: 0.8, orbitGain: 1.0, active: 2, rate: 1.0, sync: 0, accent: new THREE.Color("#ce7fd8") },
+  { p: 0.885, yaw: 2.7, pitch: -0.14, scale: 1.05, exposure: 0.88, orbitGain: 1.0, active: 3, rate: 0.5, sync: 0, accent: new THREE.Color("#f472b6") },
+  { p: 0.985, yaw: Math.PI * 2, pitch: 0, scale: 1.05, exposure: 0.95, orbitGain: 0.6, active: -1, rate: 0.7, sync: 1, accent: new THREE.Color("#fb7185") },
 ];
 
 /** Fixed on-screen home of the brain (v5 — no translation choreography). */
@@ -193,7 +201,7 @@ export interface StopSample {
   /** Discrete pose targets — the driver's spring chases these. */
   yaw: number;
   pitch: number;
-  /** Discrete section index 0..5 (hero…contact) for label selection. */
+  /** Discrete section index 0..6 (hero…contact, incl. hardware). */
   section: number;
 }
 

@@ -4,6 +4,7 @@ import Nav from "@/components/sections/Nav";
 import Hero from "@/components/sections/Hero";
 import About from "@/components/sections/About";
 import Projects from "@/components/sections/Projects";
+import HardwareDive from "@/components/hardware/HardwareDive";
 import OpenSource from "@/components/sections/OpenSource";
 import Experience from "@/components/sections/Experience";
 import Honors from "@/components/sections/Honors";
@@ -30,6 +31,7 @@ export default function Home() {
         <Hero />
         <About />
         <Projects />
+        <HardwareDive />
         <OpenSource />
         <Experience />
         <Honors />
