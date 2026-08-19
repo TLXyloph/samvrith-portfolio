@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Lenis from "lenis";
 import CursorDot from "@/components/signal/CursorDot";
 import { setScrollProgress } from "@/components/signal/scrollBus";
+import { setLenis } from "@/components/lenisRef";
 
 const SignalField = dynamic(() => import("@/components/signal/SignalField"), {
   ssr: false,
@@ -45,7 +46,11 @@ export default function SignalLayer() {
 
     const lenis = new Lenis({ autoRaf: true, lerp: 0.1, anchors: true });
     lenis.on("scroll", (l: Lenis) => setScrollProgress(l.progress));
-    return () => lenis.destroy();
+    setLenis(lenis);
+    return () => {
+      setLenis(null);
+      lenis.destroy();
+    };
   }, []);
 
   return (
